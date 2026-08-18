@@ -1,8 +1,58 @@
 import tkinter as tk
-import sqlite3, threading, math, time, datetime, json, random, sys, textwrap
-from pathlib   import Path
-from threading import Lock
-from tkinter   import messagebox
+import threading, math, time, datetime, json, random, sys, textwrap
+from pathlib import Path
+from tkinter import messagebox
+
+from .database import (
+    db_criar,
+    db_listar,
+    db_concluir,
+    db_excluir,
+    db_alterar,
+    db_marcar_lembrado,
+    db_reset_lembrado,
+    db_adiar,
+    db_streak_hoje,
+    db_limpar_antigas,
+    db_obter,
+)
+
+
+# ARMAZENAMENTO
+
+HOME = Path.home() / ".marvin"
+HOME.mkdir(exist_ok=True)
+
+CFG_F = HOME / "config.json"
+
+_CFG_DEFAULTS = {
+    "pos_x": None,
+    "pos_y": None,
+    "nao_perturbe": False,
+    "som": True,
+    "opacidade": 1.0,
+}
+
+
+def _load_cfg():
+    if CFG_F.exists():
+        try:
+            d = json.loads(CFG_F.read_text("utf-8"))
+            return {**_CFG_DEFAULTS, **d}
+        except Exception:
+            pass
+
+    return dict(_CFG_DEFAULTS)
+
+
+cfg = _load_cfg()
+
+
+def save_cfg():
+    CFG_F.write_text(
+        json.dumps(cfg, ensure_ascii=False, indent=2),
+        "utf-8"
+    )
 
 #  SOM NATIVO
 
@@ -17,143 +67,6 @@ def _beep():
     except Exception:
         pass
 
-
-#  ARMAZENAMENTO
-
-HOME  = Path.home() / ".marvin"
-HOME.mkdir(exist_ok=True)
-DB_F  = HOME / "marvin.db"
-CFG_F = HOME / "config.json"
-
-_CFG_DEFAULTS = {
-    "pos_x":        None,
-    "pos_y":        None,
-    "nao_perturbe": False,
-    "som":          True,
-    "opacidade":    1.0,
-}
-
-def _load_cfg():
-    if CFG_F.exists():
-        try:
-            d = json.loads(CFG_F.read_text("utf-8"))
-            return {**_CFG_DEFAULTS, **d}
-        except Exception:
-            pass
-    return dict(_CFG_DEFAULTS)
-
-cfg = _load_cfg()
-
-def save_cfg():
-    CFG_F.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
-
-#  BANCO DE DADOS
-
-con      = sqlite3.connect(str(DB_F), check_same_thread=False)
-cursor   = con.cursor()
-_db_lock = Lock()
-
-def _migrate():
-    """Cria/atualiza schema sem perder dados."""
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tarefas (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            texto        TEXT    NOT NULL,
-            descricao    TEXT    DEFAULT '',
-            data         TEXT    NOT NULL,
-            hora         TEXT    NOT NULL,
-            recorrencia  TEXT    DEFAULT 'Nunca',
-            concluida    INTEGER DEFAULT 0,
-            lembrado     INTEGER DEFAULT 0,
-            ativo        INTEGER DEFAULT 1,
-            criado_em    TEXT    DEFAULT NULL,
-            concluido_em TEXT    DEFAULT NULL
-        )
-    """)
-    # Migracao segura: adiciona colunas que possam faltar em BDs antigos.
-    # ALTER TABLE no SQLite nao aceita defaults dinamicos, apenas constantes.
-    cols = {r[1] for r in cursor.execute("PRAGMA table_info(tarefas)")}
-    for col in ("criado_em", "concluido_em"):
-        if col not in cols:
-            cursor.execute(
-                f"ALTER TABLE tarefas ADD COLUMN {col} TEXT DEFAULT NULL"
-            )
-    con.commit()
-
-_migrate()
-
-def db_criar(texto, descricao, data, hora, recorrencia):
-    with _db_lock:
-        agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute(
-            "INSERT INTO tarefas "
-            "(texto,descricao,data,hora,recorrencia,criado_em) "
-            "VALUES (?,?,?,?,?,?)",
-            (texto, descricao, data, hora, recorrencia, agora))
-        con.commit()
-
-def db_listar(apenas_pendentes=False):
-    with _db_lock:
-        q = ("SELECT id,texto,descricao,data,hora,recorrencia,concluida,lembrado "
-             "FROM tarefas WHERE ativo=1")
-        if apenas_pendentes:
-            q += " AND concluida=0"
-        q += " ORDER BY data,hora"
-        cursor.execute(q)
-        return cursor.fetchall()
-
-def db_concluir(tid):
-    agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with _db_lock:
-        cursor.execute(
-            "UPDATE tarefas SET concluida=1, lembrado=1, concluido_em=? WHERE id=?",
-            (agora, tid))
-        con.commit()
-
-def db_excluir(tid):
-    with _db_lock:
-        cursor.execute("UPDATE tarefas SET ativo=0 WHERE id=?", (tid,))
-        con.commit()
-
-def db_alterar(tid, campo, valor):
-    with _db_lock:
-        cursor.execute(f"UPDATE tarefas SET {campo}=? WHERE id=?", (valor, tid))
-        con.commit()
-
-def db_marcar_lembrado(tid):
-    with _db_lock:
-        cursor.execute("UPDATE tarefas SET lembrado=1 WHERE id=?", (tid,))
-        con.commit()
-
-def db_reset_lembrado(tid):
-    with _db_lock:
-        cursor.execute("UPDATE tarefas SET lembrado=0 WHERE id=?", (tid,))
-        con.commit()
-
-def db_adiar(tid, nova_data, nova_hora):
-    with _db_lock:
-        cursor.execute(
-            "UPDATE tarefas SET data=?,hora=?,lembrado=0 WHERE id=?",
-            (nova_data, nova_hora, tid))
-        con.commit()
-
-def db_streak_hoje():
-    hoje = datetime.date.today().strftime("%Y-%m-%d")
-    with _db_lock:
-        cursor.execute(
-            "SELECT COUNT(*) FROM tarefas "
-            "WHERE ativo=1 AND concluida=1 AND substr(concluido_em,1,10)=?",
-            (hoje,))
-        return cursor.fetchone()[0]
-
-def db_limpar_antigas(dias=30):
-    corte = (datetime.date.today() - datetime.timedelta(days=dias)).isoformat()
-    with _db_lock:
-        cursor.execute(
-            "DELETE FROM tarefas WHERE concluida=1 "
-            "AND concluido_em IS NOT NULL AND substr(concluido_em,1,10)<?",
-            (corte,))
-        con.commit()
 
 #  PALETA
 
@@ -708,11 +621,7 @@ class EditTaskWindow:
         self.comp     = companion
         self.tid      = tid
         self.callback = callback
-        with _db_lock:
-            cursor.execute(
-                "SELECT texto,descricao,data,hora,recorrencia "
-                "FROM tarefas WHERE id=?", (tid,))
-            row = cursor.fetchone()
+        row = db_obter(tid)
         if not row:
             return
         texto, desc, data, hora, rep = row
