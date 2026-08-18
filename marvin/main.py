@@ -1,7 +1,8 @@
 import tkinter as tk
-import threading, math, time, datetime, json, random, sys, textwrap
-from pathlib import Path
+import threading, math, time, datetime, random, sys, textwrap
 from tkinter import messagebox
+
+from .config import load_cfg, save_cfg
 
 from .database import (
     db_criar,
@@ -18,41 +19,10 @@ from .database import (
 )
 
 
-# ARMAZENAMENTO
+# CONFIGURAÇÃO
 
-HOME = Path.home() / ".marvin"
-HOME.mkdir(exist_ok=True)
+cfg = load_cfg()
 
-CFG_F = HOME / "config.json"
-
-_CFG_DEFAULTS = {
-    "pos_x": None,
-    "pos_y": None,
-    "nao_perturbe": False,
-    "som": True,
-    "opacidade": 1.0,
-}
-
-
-def _load_cfg():
-    if CFG_F.exists():
-        try:
-            d = json.loads(CFG_F.read_text("utf-8"))
-            return {**_CFG_DEFAULTS, **d}
-        except Exception:
-            pass
-
-    return dict(_CFG_DEFAULTS)
-
-
-cfg = _load_cfg()
-
-
-def save_cfg():
-    CFG_F.write_text(
-        json.dumps(cfg, ensure_ascii=False, indent=2),
-        "utf-8"
-    )
 
 #  SOM NATIVO
 
@@ -785,7 +755,7 @@ class SettingsWindow:
         cfg["nao_perturbe"] = self.v_np.get()
         cfg["som"]          = self.v_som.get()
         cfg["opacidade"]    = round(self.v_op.get(), 2)
-        save_cfg()
+        save_cfg(cfg)
         try:
             self.comp.root.attributes("-alpha", cfg["opacidade"])
         except Exception:
@@ -1127,7 +1097,7 @@ class MarvinCompanion:
 
     def _toggle_np(self):
         cfg["nao_perturbe"] = not cfg.get("nao_perturbe", False)
-        save_cfg()
+        save_cfg(cfg)
         # Atualiza o label do item de menu pelo indice (3)
         self.ctx.entryconfig(3, label=self._np_label())
         estado = "ativado" if cfg["nao_perturbe"] else "desativado"
@@ -1226,7 +1196,7 @@ class MarvinCompanion:
     def _drag_end(self, e):
         cfg["pos_x"] = self.root.winfo_x()
         cfg["pos_y"] = self.root.winfo_y()
-        save_cfg()
+        save_cfg(cfg)
         if not self._dragging:
             self._on_click()
         self._dragging  = False
@@ -1327,7 +1297,7 @@ class MarvinCompanion:
     def _on_close(self):
         cfg["pos_x"] = self.root.winfo_x()
         cfg["pos_y"] = self.root.winfo_y()
-        save_cfg()
+        save_cfg(cfg)
         self.root.destroy()
 
     def run(self):
