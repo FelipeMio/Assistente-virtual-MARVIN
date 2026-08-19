@@ -93,6 +93,16 @@ def db_concluir(tid):
 
         con.commit()
 
+def db_desconcluir(tid):
+    with _db_lock:
+        cursor.execute(
+            "UPDATE tarefas "
+            "SET concluida=0, concluido_em=NULL "
+            "WHERE id=?",
+            (tid,),
+        )
+
+        con.commit()
 
 def db_excluir(tid):
     with _db_lock:
