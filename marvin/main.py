@@ -1002,10 +1002,6 @@ class InteractionPanel:
         rx = root.winfo_x()
         ry = root.winfo_y()
         rw = companion.W
-        sw = root.winfo_screenwidth()
-        px = rx - 228 if rx > 238 else rx + rw + 4
-        px = max(0, min(px, sw - 240))
-        self.win.geometry(f"+{px}+{max(0, ry + 20)}")
 
         inner = tk.Frame(self.win, bg=C["panel"])
         inner.pack(padx=1, pady=1)
@@ -1014,6 +1010,81 @@ class InteractionPanel:
             self._build_alert(inner)
         else:
             self._build_idle(inner)
+
+        # -----------------------------------------------------
+        # POSICIONAMENTO MULTI-MONITOR
+        # Abre o painel sempre no mesmo monitor do MARVIN.
+        # -----------------------------------------------------
+        self.win.update_idletasks()
+
+        ww = self.win.winfo_reqwidth()
+        wh = self.win.winfo_reqheight()
+
+        # Fallback para a tela principal
+        mon_left = 0
+        mon_top = 0
+        mon_right = root.winfo_screenwidth()
+        mon_bottom = root.winfo_screenheight()
+
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                class MONITORINFO(ctypes.Structure):
+                    _fields_ = [
+                        ("cbSize", wintypes.DWORD),
+                        ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT),
+                        ("dwFlags", wintypes.DWORD),
+                    ]
+
+                user32 = ctypes.windll.user32
+
+                monitor = user32.MonitorFromWindow(
+                    root.winfo_id(),
+                    2  # MONITOR_DEFAULTTONEAREST
+                )
+
+                info = MONITORINFO()
+                info.cbSize = ctypes.sizeof(MONITORINFO)
+
+                if user32.GetMonitorInfoW(
+                    monitor,
+                    ctypes.byref(info)
+                ):
+                    mon_left = info.rcWork.left
+                    mon_top = info.rcWork.top
+                    mon_right = info.rcWork.right
+                    mon_bottom = info.rcWork.bottom
+
+            except Exception:
+                pass
+
+        gap = 6
+
+        # Primeiro tenta abrir à esquerda do MARVIN.
+        if rx - ww - gap >= mon_left:
+            px = rx - ww - gap
+
+        # Se nao houver espaco, abre à direita.
+        elif rx + rw + gap + ww <= mon_right:
+            px = rx + rw + gap
+
+        else:
+            # Ultimo recurso: mantem dentro do monitor atual.
+            px = max(
+                mon_left,
+                min(rx + rw + gap, mon_right - ww)
+            )
+
+        # Mantem também dentro da altura do monitor.
+        py = max(
+            mon_top,
+            min(ry + 20, mon_bottom - wh)
+        )
+
+        self.win.geometry(f"+{px}+{py}")
 
         self.win.bind("<FocusOut>", lambda e: self._close())
         self.win.focus_force()
@@ -1695,7 +1766,7 @@ class MarvinCompanion:
                     minutos = int(button)
                     novo_horario = datetime.now() + timedelta(minutes=minutos)
 
-                    nova_data = novo_horario.strftime("%d/%m/%Y")
+                    nova_data = novo_horario.strftime("%Y-%m-%d")
                     nova_hora = novo_horario.strftime("%H:%M")
 
                     db_adiar(
@@ -1713,11 +1784,41 @@ class MarvinCompanion:
                 self._bubble_hover = None
 
             else:
-                self._bubble_mode = "normal"
-                self._bubble_hover = None
+                # Clique esquerdo comum:
+                # abre o painel somente quando nao existe lembrete ativo.
+                if (
+                    self._bubble_mode == "normal"
+                    and not self._reminder_queue
+                ):
+                    self._on_click()
 
         self._dragging = False
         self._drag_dist = 0
+
+    def _on_click(self):
+        # Durante alertas, toda interacao acontece no proprio balao.
+        if self._bubble_mode in ("alert", "snooze"):
+            return
+
+        if self._reminder_queue:
+            return
+
+        if self._panel_open:
+            return
+
+        self._panel_open = True
+
+        panel = InteractionPanel(
+            self.root,
+            self,
+            mode="idle"
+        )
+
+        panel.win.bind(
+            "<Destroy>",
+            lambda e: setattr(self, "_panel_open", False)
+        )
+
     def _show_menu(self, e):
         try:
             self.ctx.tk_popup(e.x_root, e.y_root)
