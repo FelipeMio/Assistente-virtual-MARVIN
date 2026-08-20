@@ -448,6 +448,90 @@ def _make_win(parent, title, w, h, resizable=False):
     return win
 
 
+def _position_near_marvin(win, companion):
+    """Posiciona uma janela no mesmo monitor e perto do MARVIN."""
+
+    root = companion.root
+
+    win.update_idletasks()
+
+    ww = win.winfo_width()
+    wh = win.winfo_height()
+
+    rx = root.winfo_x()
+    ry = root.winfo_y()
+    rw = companion.W
+    rh = companion.H
+
+    # Fallback para monitor principal
+    mon_left = 0
+    mon_top = 0
+    mon_right = root.winfo_screenwidth()
+    mon_bottom = root.winfo_screenheight()
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class MONITORINFO(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.DWORD),
+                    ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT),
+                    ("dwFlags", wintypes.DWORD),
+                ]
+
+            user32 = ctypes.windll.user32
+
+            monitor = user32.MonitorFromWindow(
+                root.winfo_id(),
+                2  # MONITOR_DEFAULTTONEAREST
+            )
+
+            info = MONITORINFO()
+            info.cbSize = ctypes.sizeof(MONITORINFO)
+
+            if user32.GetMonitorInfoW(
+                monitor,
+                ctypes.byref(info)
+            ):
+                mon_left = info.rcWork.left
+                mon_top = info.rcWork.top
+                mon_right = info.rcWork.right
+                mon_bottom = info.rcWork.bottom
+
+        except Exception:
+            pass
+
+    gap = 12
+
+    # Tenta abrir do lado esquerdo
+    if rx - ww - gap >= mon_left:
+        px = rx - ww - gap
+
+    # Senao abre do lado direito
+    elif rx + rw + gap + ww <= mon_right:
+        px = rx + rw + gap
+
+    # Ultimo recurso: mantem dentro do monitor
+    else:
+        px = max(
+            mon_left,
+            min(rx + rw + gap, mon_right - ww)
+        )
+
+    # Centraliza verticalmente em relacao ao MARVIN
+    py = ry + (rh - wh) // 2
+
+    py = max(
+        mon_top,
+        min(py, mon_bottom - wh)
+    )
+
+    win.geometry(f"+{px}+{py}")
+
+
 def _header(win, title):
     hf = tk.Frame(win, bg=C["panel"], height=42)
     hf.pack(fill="x")
@@ -513,6 +597,90 @@ class NewTaskWindow:
         self.win  = _make_win(parent, "Nova Tarefa", 400, 385)
         self.win.grab_set()
         self._build(prefill)
+        self._position_near_marvin()
+
+    def _position_near_marvin(self):
+        root = self.comp.root
+
+        self.win.update_idletasks()
+
+        ww = self.win.winfo_width()
+        wh = self.win.winfo_height()
+
+        rx = root.winfo_x()
+        ry = root.winfo_y()
+        rw = self.comp.W
+        rh = self.comp.H
+
+        # Fallback: monitor principal
+        mon_left = 0
+        mon_top = 0
+        mon_right = root.winfo_screenwidth()
+        mon_bottom = root.winfo_screenheight()
+
+        # Descobre o monitor em que o MARVIN esta
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                class MONITORINFO(ctypes.Structure):
+                    _fields_ = [
+                        ("cbSize", wintypes.DWORD),
+                        ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT),
+                        ("dwFlags", wintypes.DWORD),
+                    ]
+
+                user32 = ctypes.windll.user32
+
+                monitor = user32.MonitorFromWindow(
+                    root.winfo_id(),
+                    2  # MONITOR_DEFAULTTONEAREST
+                )
+
+                info = MONITORINFO()
+                info.cbSize = ctypes.sizeof(MONITORINFO)
+
+                if user32.GetMonitorInfoW(
+                    monitor,
+                    ctypes.byref(info)
+                ):
+                    mon_left = info.rcWork.left
+                    mon_top = info.rcWork.top
+                    mon_right = info.rcWork.right
+                    mon_bottom = info.rcWork.bottom
+
+            except Exception:
+                pass
+
+        gap = 12
+
+        # Tenta abrir primeiro do lado esquerdo do MARVIN
+        if rx - ww - gap >= mon_left:
+            px = rx - ww - gap
+
+        # Se nao couber, abre do lado direito
+        elif rx + rw + gap + ww <= mon_right:
+            px = rx + rw + gap
+
+        # Ultimo recurso: mantem dentro do monitor
+        else:
+            px = max(
+                mon_left,
+                min(rx - ww - gap, mon_right - ww)
+            )
+
+        # Centraliza verticalmente em relacao ao MARVIN
+        py = ry + (rh - wh) // 2
+
+        # Mantem dentro da area util do monitor
+        py = max(
+            mon_top,
+            min(py, mon_bottom - wh)
+        )
+
+        self.win.geometry(f"+{px}+{py}")
 
     def _build(self, prefill):
         w = self.win
@@ -641,6 +809,7 @@ class TaskWindow:
         self.parent = parent
         self.win    = _make_win(parent, "Tarefas", 440, 520, resizable=True)
         self._build()
+        _position_near_marvin(self.win, self.comp)
 
     def _build(self):
         w = self.win
@@ -820,6 +989,7 @@ class EditTaskWindow:
         self.win = _make_win(parent, "Editar Tarefa", 400, 370)
         self.win.grab_set()
         self._build(texto, desc, data, hora, rep)
+        _position_near_marvin(self.win, self.comp)
 
     def _build(self, texto, desc, data, hora, rep):
         w = self.win
@@ -904,6 +1074,7 @@ class SettingsWindow:
         self.win  = _make_win(parent, "Configuracoes", 400, 310)
         self.win.grab_set()
         self._build()
+        _position_near_marvin(self.win, self.comp)
 
     def _build(self):
         w = self.win
@@ -1458,10 +1629,15 @@ class MarvinCompanion:
 
         # Sprites do MARVIN
         self._idle_frames = self._load_idle_frames()
+        self._alert_frames = self._load_alert_frames()
 
         # Controle da piscada
         self._next_blink = time.monotonic() + random.uniform(3.0, 6.0)
         self._blink_until = 0.0
+
+        # Controle da animacao de alerta
+        self._alert_frame_index = 0
+        self._alert_last_frame = time.monotonic()
 
         # Estado
         self.t               = 0.0
@@ -1564,6 +1740,43 @@ class MarvinCompanion:
 
         return frames
 
+    def _load_alert_frames(self):
+        pasta = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+            / "alert"
+        )
+
+        arquivos = [
+            pasta / "01.png",
+            pasta / "02.png",
+        ]
+
+        frames = []
+
+        for arquivo in arquivos:
+            if not arquivo.exists():
+                print(f"[MARVIN] Sprite de alerta nao encontrado: {arquivo}")
+                continue
+
+            imagem = Image.open(arquivo).convert("RGBA")
+
+            imagem = imagem.resize(
+                (150, 150),
+                Image.Resampling.NEAREST
+            )
+
+            frame = ImageTk.PhotoImage(imagem)
+            frames.append(frame)
+
+        print(
+            f"[MARVIN] {len(frames)} frame(s) alert carregado(s)."
+        )
+
+        return frames
+
+
     def _draw_idle_sprite(self):
         if not self._idle_frames:
             return None
@@ -1606,6 +1819,43 @@ class MarvinCompanion:
         )
 
         return top_y
+
+    def _draw_alert_sprite(self):
+        if not self._alert_frames:
+            return None
+
+        now = time.monotonic()
+
+        # Troca de frame aproximadamente a cada 180 ms
+        if now - self._alert_last_frame >= 0.18:
+            self._alert_frame_index = (
+                self._alert_frame_index + 1
+            ) % len(self._alert_frames)
+
+            self._alert_last_frame = now
+
+        frame = self._alert_frames[self._alert_frame_index]
+
+        self.cv.delete("all")
+
+        bob = int(math.sin(self.t * 1.4) * 3)
+
+        x = self.W // 2
+        bottom_y = self.H - 8 + bob
+
+        sprite_h = frame.height()
+
+        top_y = bottom_y - sprite_h
+
+        self.cv.create_image(
+            x,
+            bottom_y,
+            image=frame,
+            anchor="s"
+        )
+
+        return top_y
+
 
     # ── Nao Perturbe ─────────────────────────────────────────────────────────
 
@@ -1693,19 +1943,33 @@ class MarvinCompanion:
         self.t += 0.05
         if self.b_timer > 0:
             self.b_timer -= 50
+
             if self.b_timer <= 0:
-                self.bubble = ""
-                if not self._reminder_queue:
+
+                # Nunca fecha automaticamente um lembrete.
+                if self._reminder_queue:
+                    self.b_timer = 0
+
+                # Baloes normais continuam fechando pelo tempo.
+                else:
+                    self.bubble = ""
                     self.state = "idle"
 
-        # Usa os novos sprites no estado normal.
-        # Outros estados ainda usam o desenho antigo como fallback.
+        # Sprite de lembrete
         if (
+            self.state == "alert"
+            and self._alert_frames
+        ):
+            top_y = self._draw_alert_sprite()
+
+        # Sprite normal
+        elif (
             self.state in ("idle", "talking")
             and self._idle_frames
         ):
             top_y = self._draw_idle_sprite()
 
+        # Fallback para a pixel art antiga
         else:
             draw_cat(
                 self.cv,
@@ -1942,7 +2206,7 @@ class MarvinCompanion:
     def _start_reminders(self):
         def loop():
             while True:
-                time.sleep(15)
+                time.sleep(1)
                 now   = datetime.datetime.now()
                 today = now.strftime("%Y-%m-%d")
                 try:
@@ -2006,6 +2270,10 @@ class MarvinCompanion:
         self._bubble_mode = "alert"
         self._bubble_hover = None
         self.state = "alert"
+
+        # Lembretes nao possuem tempo para desaparecer.
+        # Ficam visiveis ate concluir ou adiar.
+        self.b_timer = 0
         self.bubble = f"Hora de: {row[1]}"
 
     def _on_close(self):
