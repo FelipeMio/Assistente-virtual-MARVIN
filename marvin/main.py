@@ -1507,14 +1507,24 @@ class MarvinCompanion:
     def _next_reminder(self):
         if self._reminder_queue:
             self._reminder_queue.pop(0)
+
         if self._reminder_queue:
             nxt = self._reminder_queue[0]
-            self.state   = "alert"
+
+            self.state = "alert"
             self.b_timer = 0
-            self.bubble  = f"Hora de: {nxt[1]}"
+            self.bubble = f"Hora de: {nxt[1]}"
+
+            self._bubble_mode = "alert"
+            self._bubble_hover = None
+
         else:
-            self.state  = "idle"
+            self.state = "idle"
             self.bubble = ""
+            self.b_timer = 0
+
+            self._bubble_mode = "normal"
+            self._bubble_hover = None
 
     # ── Animacao ──────────────────────────────────────────────────────────────
 
