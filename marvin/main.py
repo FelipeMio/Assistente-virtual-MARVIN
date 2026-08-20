@@ -1,22 +1,24 @@
-import tkinter as tk
+﻿import tkinter as tk
 import threading, math, time, datetime, random, sys, textwrap
 from tkinter import messagebox
 
 from .config import load_cfg, save_cfg
 
-from .database import (
-    db_criar,
+from marvin.database import (
     db_listar,
+    db_criar,
     db_concluir,
+    db_desconcluir,
     db_excluir,
     db_alterar,
+    db_obter,
     db_marcar_lembrado,
     db_reset_lembrado,
     db_adiar,
     db_streak_hoje,
     db_limpar_antigas,
-    db_obter,
 )
+
 
 
 # CONFIGURAÇÃO
@@ -180,30 +182,236 @@ def draw_cat(cv, t, state, W, H):
                                  fill=cor, outline="")
 
 
-def draw_bubble(cv, t, cx, top_y, text, W):
+def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
+
+    # ---------------------------------------------------------
+    # TEXTO
+    # ---------------------------------------------------------
     wrapped = textwrap.wrap(text, width=26)[:4]
+
     if not wrapped:
         return
+
     line_h, py = 15, 9
-    bw  = min(220, W + 60)
-    bh  = len(wrapped) * line_h + py * 2
-    bx  = max(6, cx - bw // 2)
-    by  = max(6, top_y - bh - 16)
-    cv.create_rectangle(bx+2, by+2, bx+bw+2, by+bh+2,
-                         fill="#060c14", outline="")
-    cv.create_rectangle(bx, by, bx+bw, by+bh,
-                         fill=C["bub_bg"], outline=C["bub_bd"], width=2)
-    tip = min(max(cx, bx+16), bx+bw-16)
-    cv.create_polygon([tip-7, by+bh, tip+7, by+bh, tip, top_y-2],
-                       fill=C["bub_bg"], outline=C["bub_bd"])
-    cv.create_line(bx+2, by+bh, tip-7, by+bh,
-                   fill=C["bub_bd"], width=2)
-    cv.create_line(tip+7, by+bh, bx+bw-2, by+bh,
-                   fill=C["bub_bd"], width=2)
+
+    # Altura adicional para os controles
+    if mode == "alert":
+        button_h = 34
+    elif mode == "snooze":
+        button_h = 54
+    else:
+        button_h = 0
+
+    # O balão precisa caber dentro do Canvas.
+    # Antes ele ficava maior que a janela e cortava o último botão.
+    # Mantem qualquer balao dentro da largura do Canvas
+    bw = max(1, W - 12)
+
+    bh = (
+        len(wrapped) * line_h
+        + py * 2
+        + button_h
+    )
+
+    bx = max(6, cx - bw // 2)
+    by = max(6, top_y - bh - 16)
+
+    # ---------------------------------------------------------
+    # SOMBRA
+    # ---------------------------------------------------------
+    cv.create_rectangle(
+        bx + 2, by + 2,
+        bx + bw + 2, by + bh + 2,
+        fill="#060c14",
+        outline=""
+    )
+
+    # ---------------------------------------------------------
+    # BALÃO
+    # ---------------------------------------------------------
+    cv.create_rectangle(
+        bx, by,
+        bx + bw, by + bh,
+        fill=C["bub_bg"],
+        outline=C["bub_bd"],
+        width=2
+    )
+
+    # ---------------------------------------------------------
+    # PONTA DO BALÃO
+    # ---------------------------------------------------------
+    tip = min(
+        max(cx, bx + 16),
+        bx + bw - 16
+    )
+
+    cv.create_polygon(
+        [
+            tip - 7, by + bh,
+            tip + 7, by + bh,
+            tip, top_y - 2
+        ],
+        fill=C["bub_bg"],
+        outline=C["bub_bd"]
+    )
+
+    cv.create_line(
+        bx + 2, by + bh,
+        tip - 7, by + bh,
+        fill=C["bub_bd"],
+        width=2
+    )
+
+    cv.create_line(
+        tip + 7, by + bh,
+        bx + bw - 2, by + bh,
+        fill=C["bub_bd"],
+        width=2
+    )
+
+    # ---------------------------------------------------------
+    # TEXTO
+    # ---------------------------------------------------------
+    text_y = by + py
+
     for i, line in enumerate(wrapped):
-        cv.create_text(bx+bw//2, by+py+i*line_h+line_h//2,
-                        text=line, fill=C["text"],
-                        font=("Consolas", 8), anchor="center")
+
+        cv.create_text(
+            bx + bw // 2,
+            text_y + i * line_h + line_h // 2,
+            text=line,
+            fill=C["text"],
+            font=("Consolas", 8),
+            anchor="center"
+        )
+
+    # =========================================================
+    # ALERTA
+    # =========================================================
+    if mode == "alert":
+
+        button_y = by + py + len(wrapped) * line_h + 5
+
+        # posições dos dois botões
+        complete_x = bx + bw // 3
+        snooze_x = bx + (bw * 2) // 3
+
+        # -------------------------
+        # CONCLUIR
+        # -------------------------
+        complete_active = hover == "complete"
+
+        cv.create_oval(
+            complete_x - 11,
+            button_y,
+            complete_x + 11,
+            button_y + 22,
+            fill=C["green"] if complete_active else C["panel"],
+            outline=C["green"],
+            width=2
+        )
+
+        cv.create_text(
+            complete_x,
+            button_y + 11,
+            text="✓",
+            fill="#ffffff",
+            font=("Consolas", 11, "bold")
+        )
+
+        cv.create_text(
+            complete_x,
+            button_y + 29,
+            text="concluir",
+            fill=C["dim"],
+            font=("Consolas", 7)
+        )
+
+        # -------------------------
+        # ADIAR
+        # -------------------------
+        snooze_active = hover == "snooze"
+
+        cv.create_oval(
+            snooze_x - 11,
+            button_y,
+            snooze_x + 11,
+            button_y + 22,
+            fill=C["accent"] if snooze_active else C["panel"],
+            outline=C["accent"],
+            width=2
+        )
+
+        cv.create_text(
+            snooze_x,
+            button_y + 11,
+            text="⏰",
+            fill="#ffffff",
+            font=("Segoe UI Symbol", 9)
+        )
+
+        cv.create_text(
+            snooze_x,
+            button_y + 29,
+            text="adiar",
+            fill=C["dim"],
+            font=("Consolas", 7)
+        )
+
+    # =========================================================
+    # MENU DE ADIAMENTO
+    # =========================================================
+    elif mode == "snooze":
+
+        button_y = by + py + len(wrapped) * line_h + 5
+
+        options = [
+            ("5", "5m"),
+            ("15", "15m"),
+            ("30", "30m"),
+            ("60", "1h"),
+        ]
+
+        spacing = bw / 4
+
+        for i, (value, label) in enumerate(options):
+
+            x = bx + spacing * i + spacing / 2
+
+            active = hover == value
+
+            cv.create_oval(
+                x - 14,
+                button_y,
+                x + 14,
+                button_y + 24,
+                fill=C["accent"] if active else C["panel"],
+                outline=C["accent"],
+                width=1
+            )
+
+            cv.create_text(
+                x,
+                button_y + 12,
+                text=label,
+                fill="#ffffff",
+                font=("Consolas", 7, "bold")
+            )
+
+        # -------------------------
+        # VOLTAR
+        # -------------------------
+        back_y = button_y + 31
+
+        active = hover == "back"
+
+        cv.create_text(
+            bx + bw // 2,
+            back_y,
+            text="↩ voltar",
+            fill=C["accent"] if active else C["dim"],
+            font=("Consolas", 7, "bold")
+        )
 
 #  FRASES IDLE
 
@@ -383,23 +591,44 @@ class NewTaskWindow:
 
     def _validate_live(self, *_):
         d_ok = _validate_date(self.v_data.get()) is not None
-        h_ok = _validate_time(self.v_hora.get())  is not None
-        self.e_data.config(fg=C["text"] if d_ok else C["red"])
-        self.e_hora.config(fg=C["text"] if h_ok else C["red"])
+        h_ok = _validate_time(self.v_hora.get()) is not None
+
+        self.e_data.config(
+            fg=C["text"] if d_ok else C["red"]
+        )
+
+        self.e_hora.config(
+            fg=C["text"] if h_ok else C["red"]
+        )
 
     def _salvar(self):
-        texto = self.v_txt.get().strip()
-        desc  = self.v_desc.get().strip()
-        data  = _validate_date(self.v_data.get())
-        hora  = _validate_time(self.v_hora.get())
-        if not texto:
-            self.v_err.set("Digite o titulo da tarefa."); return
+        txt = self.v_txt.get().strip()
+        desc = self.v_desc.get().strip()
+
+        data = _validate_date(self.v_data.get())
+        hora = _validate_time(self.v_hora.get())
+
+        if not txt:
+            self.v_err.set("Titulo nao pode ser vazio.")
+            return
+
         if data is None:
-            self.v_err.set("Data invalida. Use DD/MM/AAAA."); return
+            self.v_err.set("Data invalida. Use DD/MM/AAAA.")
+            return
+
         if hora is None:
-            self.v_err.set("Horario invalido. Use HH:MM."); return
-        db_criar(texto, desc, data, hora, self.v_rep.get())
-        self.comp.say("Tarefa registrada!", "talking", 3000)
+            self.v_err.set("Horario invalido. Use HH:MM.")
+            return
+
+        db_criar(
+            txt,
+            desc,
+            data,
+            hora,
+            self.v_rep.get(),
+        )
+
+        self.comp.say("Tarefa criada!", "talking", 2000)
         self.win.destroy()
 
 #  JANELA: LISTA DE TAREFAS
@@ -413,31 +642,14 @@ class TaskWindow:
 
     def _build(self):
         w = self.win
-        hf = tk.Frame(w, bg=C["panel"], height=42)
-        hf.pack(fill="x")
-        hf.pack_propagate(False)
-        tk.Label(hf, text="  Tarefas", bg=C["panel"], fg=C["accent"],
-                  font=("Consolas", 10, "bold")).pack(
-                      side="left", padx=10, pady=10)
-        tk.Button(hf, text=" x ", bg=C["panel"], fg=C["dim"], bd=0,
-                   font=("Consolas", 10), cursor="hand2",
-                   activebackground=C["panel"], activeforeground=C["red"],
-                   command=w.destroy).pack(side="right", padx=8)
-        tk.Button(hf, text=" + ", bg=C["panel"], fg=C["green"], bd=0,
-                   font=("Consolas", 13, "bold"), cursor="hand2",
-                   activebackground=C["panel"], activeforeground=C["text"],
-                   command=lambda: NewTaskWindow(self.parent, self.comp)
-                   ).pack(side="right", padx=4)
-        tk.Frame(w, bg=C["border"], height=1).pack(fill="x")
+        _header(w, "Tarefas")
 
-        self.sv = tk.StringVar()
-        tk.Label(w, textvariable=self.sv, bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 7)).pack(anchor="w", padx=14, pady=3)
-
+        # Filtros
         # Filtros
         fbar = tk.Frame(w, bg=C["win_bg"])
         fbar.pack(fill="x", padx=10, pady=(0, 4))
         self.filtro = tk.StringVar(value="todas")
+        self.sv = tk.StringVar(value="")
         for label, val in [("Todas", "todas"),
                             ("Pendentes", "pendentes"),
                             ("Concluidas", "concluidas")]:
@@ -464,9 +676,14 @@ class TaskWindow:
         self.lf.bind("<Configure>",
                       lambda e: self._cv.configure(
                           scrollregion=self._cv.bbox("all")))
-        self._cv.bind_all("<MouseWheel>",
-                           lambda e: self._cv.yview_scroll(
-                               -1 if e.delta > 0 else 1, "units"))
+        self._cv.bind(
+    "<MouseWheel>",
+    lambda e: self._cv.yview_scroll(
+        -1 if e.delta > 0 else 1,
+        "units"
+    )
+)
+
         self._refresh()
 
     def _refresh(self):
@@ -567,15 +784,18 @@ class TaskWindow:
 
     def _toggle(self, tid):
         for r in db_listar():
-            if r[0] == tid:
-                if r[6]:
-                    db_alterar(tid, "concluida",    0)
-                    db_alterar(tid, "lembrado",     0)
-                    db_alterar(tid, "concluido_em", None)
-                else:
-                    db_concluir(tid)
-                break
+            if r[0] != tid:
+                continue
+
+            if r[6]:
+                db_desconcluir(tid)
+            else:
+                db_concluir(tid)
+
+            break
+
         self._refresh()
+
         self.comp.say("Tarefa atualizada!", "talking", 2000)
 
     def _delete(self, tid):
@@ -938,8 +1158,15 @@ class SnoozeWindow:
 
 #  POPUP DE NOTIFICACAO (canto inferior direito)
 
+#  POPUP DE NOTIFICACAO (canto inferior direito)
+
 class NotifPopup:
-    def __init__(self, root, title, body_text, duration=6000):
+    def __init__(self, root, companion, task, duration=0):
+        self.root = root
+        self.comp = companion
+        self.task = task
+        self.duration = duration
+
         self.win = tk.Toplevel(root)
         self.win.overrideredirect(True)
         self.win.attributes("-topmost", True)
@@ -948,54 +1175,168 @@ class NotifPopup:
         inner = tk.Frame(self.win, bg=C["panel"])
         inner.pack(padx=1, pady=1)
 
+        # Cabecalho
         hf = tk.Frame(inner, bg=C["panel"])
         hf.pack(fill="x", padx=8, pady=(8, 2))
-        tk.Label(hf, text=f"Lembrete: {title}",
-                  bg=C["panel"], fg=C["orange"],
-                  font=("Consolas", 9, "bold"),
-                  wraplength=220, justify="left").pack(side="left")
-        tk.Button(hf, text="x", bg=C["panel"], fg=C["dim"], bd=0,
-                   font=("Consolas", 8), cursor="hand2",
-                   activebackground=C["panel"], activeforeground=C["red"],
-                   command=self.win.destroy).pack(side="right")
 
-        if body_text:
-            tk.Label(inner, text=body_text,
-                      bg=C["panel"], fg=C["dim"],
-                      font=("Consolas", 8),
-                      wraplength=220, justify="left"
-                      ).pack(anchor="w", padx=8, pady=(0, 8))
+        tk.Label(
+            hf,
+            text="Lembrete",
+            bg=C["panel"],
+            fg=C["orange"],
+            font=("Consolas", 9, "bold")
+        ).pack(side="left")
 
-        self._bar_w    = 220
-        self._progress = tk.Frame(inner, bg=C["accent"],
-                                   height=3, width=self._bar_w)
-        self._progress.pack(fill="x")
+        tk.Button(
+            hf,
+            text="x",
+            bg=C["panel"],
+            fg=C["dim"],
+            bd=0,
+            font=("Consolas", 8),
+            cursor="hand2",
+            activebackground=C["panel"],
+            activeforeground=C["red"],
+            command=self._close
+        ).pack(side="right")
+
+        # Nome da tarefa
+        tk.Label(
+            inner,
+            text=task[1],
+            bg=C["panel"],
+            fg=C["text"],
+            font=("Consolas", 10, "bold"),
+            wraplength=240,
+            justify="left"
+        ).pack(anchor="w", padx=10, pady=(8, 4))
+
+        # Descricao
+        if task[2]:
+            tk.Label(
+                inner,
+                text=task[2],
+                bg=C["panel"],
+                fg=C["dim"],
+                font=("Consolas", 8),
+                wraplength=240,
+                justify="left"
+            ).pack(anchor="w", padx=10, pady=(0, 8))
+
+        # Horario
+        tk.Label(
+            inner,
+            text=f"Horario: {task[4][:5]}",
+            bg=C["panel"],
+            fg=C["dim"],
+            font=("Consolas", 7)
+        ).pack(anchor="w", padx=10, pady=(0, 6))
+
+        tk.Frame(
+            inner,
+            bg=C["border"],
+            height=1
+        ).pack(fill="x", padx=8, pady=3)
+
+        # Botoes
+        bf = tk.Frame(inner, bg=C["panel"])
+        bf.pack(fill="x", padx=6, pady=6)
+
+        tk.Button(
+            bf,
+            text="Concluir",
+            bg=C["green"],
+            fg=C["win_bg"],
+            bd=0,
+            padx=10,
+            pady=6,
+            font=("Consolas", 8, "bold"),
+            cursor="hand2",
+            activebackground=C["accent"],
+            activeforeground=C["win_bg"],
+            command=self._complete
+        ).pack(side="left", padx=2)
+
+        tk.Button(
+            bf,
+            text="Adiar",
+            bg=C["orange"],
+            fg=C["win_bg"],
+            bd=0,
+            padx=10,
+            pady=6,
+            font=("Consolas", 8, "bold"),
+            cursor="hand2",
+            activebackground=C["accent"],
+            activeforeground=C["win_bg"],
+            command=self._snooze
+        ).pack(side="left", padx=2)
+
+        tk.Button(
+            bf,
+            text="Tarefas",
+            bg=C["win_bg"],
+            fg=C["accent"],
+            bd=0,
+            padx=10,
+            pady=6,
+            font=("Consolas", 8),
+            cursor="hand2",
+            activebackground=C["border"],
+            activeforeground=C["text"],
+            command=self._tasks
+        ).pack(side="left", padx=2)
 
         self.win.update_idletasks()
-        sw  = self.win.winfo_screenwidth()
-        sh  = self.win.winfo_screenheight()
-        ww  = self.win.winfo_width()
-        wh  = self.win.winfo_height()
-        self.win.geometry(f"+{sw - ww - 16}+{sh - wh - 56}")
 
-        self._duration = duration
-        self._elapsed  = 0
-        self._tick     = 50
-        self._countdown()
+        # Posiciona no canto inferior direito
+        sw = self.win.winfo_screenwidth()
+        sh = self.win.winfo_screenheight()
+        ww = self.win.winfo_width()
+        wh = self.win.winfo_height()
 
-    def _countdown(self):
-        self._elapsed += self._tick
-        remaining = max(0, self._duration - self._elapsed)
-        frac      = remaining / self._duration
-        new_w     = max(1, int(self._bar_w * frac))
+        self.win.geometry(
+            f"+{sw - ww - 16}+{sh - wh - 56}"
+        )
+
+        # Se duration > 0, fecha automaticamente.
+        # Para lembretes usamos 0, portanto fica aberto.
+        if self.duration > 0:
+            self.win.after(self.duration, self._close)
+
+    def _close(self):
         try:
-            self._progress.config(width=new_w)
-            if remaining <= 0:
-                self.win.destroy()
-            else:
-                self.win.after(self._tick, self._countdown)
+            self.win.destroy()
         except Exception:
             pass
+
+    def _complete(self):
+        # Garante que a tarefa ainda e a primeira da fila
+        if self.comp._reminder_queue:
+            if self.comp._reminder_queue[0][0] == self.task[0]:
+                self.comp.complete_task()
+            else:
+                db_concluir(self.task[0])
+
+        self._close()
+
+    def _snooze(self):
+        self._close()
+
+        SnoozeWindow(
+            self.root,
+            self.comp,
+            self.task
+        )
+
+    def _tasks(self):
+        self._close()
+
+        TaskWindow(
+            self.root,
+            self.comp
+        )
+
 
 #  PERSONAGEM PRINCIPAL — MARVIN
 
@@ -1021,8 +1362,21 @@ class MarvinCompanion:
 
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        sx = cfg.get("pos_x") or sw - self.W - 20
-        sy = cfg.get("pos_y") or sh - self.H - 60
+        saved_x = cfg.get("pos_x")
+        saved_y = cfg.get("pos_y")
+
+        sx = (
+            saved_x
+            if isinstance(saved_x, int)
+            else sw - self.W - 20
+        )
+
+        sy = (
+            saved_y
+            if isinstance(saved_y, int)
+            else sh - self.H - 60
+        )
+
         self.root.geometry(f"{self.W}x{self.H}+{sx}+{sy}")
 
         self.cv = tk.Canvas(self.root, width=self.W, height=self.H,
@@ -1037,6 +1391,10 @@ class MarvinCompanion:
         self._reminder_queue = []
         self._panel_open     = False
         self._dragging       = False
+
+        # Interação do balão de lembrete
+        self._bubble_mode = "normal"
+        self._bubble_hover = None
         self._drag_dist      = 0
         self._dx = self._dy  = 0
         
@@ -1118,6 +1476,8 @@ class MarvinCompanion:
 
     def _idle_msg(self):
         if self.state == "idle" and not self.bubble:
+            self._bubble_mode = "normal"
+            self._bubble_hover = None
             self.say(random.choice(_IDLE_MSGS), "talking", 10000)
         self._schedule_idle()
 
@@ -1170,10 +1530,19 @@ class MarvinCompanion:
         draw_cat(self.cv, self.t, self.state, self.W, self.H)
 
         if self.bubble:
-            bob   = math.sin(self.t * 1.4) * 3
+            bob = math.sin(self.t * 1.4) * 3
             top_y = int(self.H - CAT_ROWS * PX - 8 + bob)
-            draw_bubble(self.cv, self.t, self.W // 2,
-                         top_y, self.bubble, self.W)
+
+            draw_bubble(
+                self.cv,
+                self.t,
+                self.W // 2,
+                top_y,
+                self.bubble,
+                self.W,
+                mode=self._bubble_mode,
+                hover=self._bubble_hover
+            )
 
         self.root.after(50, self._animate)
 
@@ -1193,26 +1562,152 @@ class MarvinCompanion:
         y = self.root.winfo_y() + dy
         self.root.geometry(f"+{x}+{y}")
 
+    def _bubble_button_at(self, x, y):
+        """
+        Retorna qual botão do balão está na posição x/y.
+        Retorna None quando não existe botão nessa posição.
+        """
+
+        if self._bubble_mode not in ("alert", "snooze"):
+            return None
+
+        if not self.bubble:
+            return None
+
+        bob = math.sin(self.t * 1.4) * 3
+        top_y = int(self.H - CAT_ROWS * PX - 8 + bob)
+
+        wrapped = textwrap.wrap(self.bubble, width=26)[:4]
+
+        if not wrapped:
+            return None
+
+        line_h = 15
+        py = 9
+
+        button_h = 34 if self._bubble_mode == "alert" else 54
+
+        # Largura do balão.
+        # No menu de adiamento usamos toda a largura disponível
+        # para garantir espaço para 5m / 15m / 30m / 1h.
+        # Mesma largura usada em draw_bubble()
+        bw = max(1, self.W - 12)
+
+        bh = (
+            len(wrapped) * line_h
+            + py * 2
+            + button_h
+        )
+
+        bx = max(6, self.W // 2 - bw // 2)
+        by = max(6, top_y - bh - 16)
+
+        if self._bubble_mode == "alert":
+
+            button_y = (
+                by
+                + py
+                + len(wrapped) * line_h
+                + 5
+            )
+
+            complete_x = bx + bw // 3
+            snooze_x = bx + (bw * 2) // 3
+
+            if (
+                (x - complete_x) ** 2
+                + (y - (button_y + 11)) ** 2
+                <= 16 ** 2
+            ):
+                return "complete"
+
+            if (
+                (x - snooze_x) ** 2
+                + (y - (button_y + 11)) ** 2
+                <= 16 ** 2
+            ):
+                return "snooze"
+
+        elif self._bubble_mode == "snooze":
+
+            button_y = (
+                by
+                + py
+                + len(wrapped) * line_h
+                + 5
+            )
+
+            spacing = bw / 4
+            options = ["5", "15", "30", "60"]
+
+            for i, value in enumerate(options):
+
+                x_button = bx + spacing * i + spacing / 2
+
+                if (
+                    (x - x_button) ** 2
+                    + (y - (button_y + 12)) ** 2
+                    <= 18 ** 2
+                ):
+                    return value
+
+            back_y = button_y + 31
+
+            if (
+                abs(x - (bx + bw // 2)) <= 45
+                and abs(y - back_y) <= 12
+            ):
+                return "back"
+
+        return None
+
     def _drag_end(self, e):
         cfg["pos_x"] = self.root.winfo_x()
         cfg["pos_y"] = self.root.winfo_y()
         save_cfg(cfg)
+
         if not self._dragging:
-            self._on_click()
-        self._dragging  = False
+            button = self._bubble_button_at(e.x, e.y)
+
+            if button == "complete":
+                self.complete_task()
+
+            elif button == "snooze":
+                self._bubble_mode = "snooze"
+                self._bubble_hover = None
+
+            elif button in ("5", "15", "30", "60"):
+                task = self.reminded_task
+
+                if task:
+                    from datetime import datetime, timedelta
+
+                    minutos = int(button)
+                    novo_horario = datetime.now() + timedelta(minutes=minutos)
+
+                    nova_data = novo_horario.strftime("%d/%m/%Y")
+                    nova_hora = novo_horario.strftime("%H:%M")
+
+                    db_adiar(
+                        task[0],
+                        nova_data,
+                        nova_hora
+                    )
+
+                    self._bubble_mode = "normal"
+                    self._bubble_hover = None
+                    self._next_reminder()
+
+            elif button == "back":
+                self._bubble_mode = "alert"
+                self._bubble_hover = None
+
+            else:
+                self._bubble_mode = "normal"
+                self._bubble_hover = None
+
+        self._dragging = False
         self._drag_dist = 0
-
-    def _on_click(self):
-        if self._panel_open:
-            return
-        self._panel_open = True
-        mode = "alert" if self._reminder_queue else "idle"
-        p    = InteractionPanel(self.root, self, mode=mode)
-        p.win.bind("<Destroy>",
-                    lambda e: setattr(self, "_panel_open", False))
-
-    # ── Menu ──────────────────────────────────────────────────────────────────
-
     def _show_menu(self, e):
         try:
             self.ctx.tk_popup(e.x_root, e.y_root)
@@ -1271,28 +1766,26 @@ class MarvinCompanion:
     def _enqueue(self, row):
         tid = row[0]
         rep = row[5]
+
+        # Evita colocar a mesma tarefa duas vezes na fila
         if any(r[0] == tid for r in self._reminder_queue):
             return
+
         db_marcar_lembrado(tid)
+
+        # Tarefas recorrentes podem ser lembradas novamente
         if rep != "Nunca":
-            self.root.after(95000, lambda i=tid: db_reset_lembrado(i))
+            self.root.after(
+                95000,
+                lambda i=tid: db_reset_lembrado(i)
+            )
 
         self._reminder_queue.append(row)
-
-        if cfg.get("nao_perturbe"):
-            NotifPopup(self.root, row[1], row[2], duration=5000)
-            return
-
-        if cfg.get("som", True):
-            threading.Thread(target=_beep, daemon=True).start()
-
-        NotifPopup(self.root, row[1], row[2])
-        if len(self._reminder_queue) == 1:
-            self.state   = "alert"
-            self.b_timer = 0
-            self.bubble  = f"Hora de: {row[1]}"
-
-    # ── Fechar ────────────────────────────────────────────────────────────────
+        
+        self._bubble_mode = "alert"
+        self._bubble_hover = None
+        self.state = "alert"
+        self.bubble = f"Hora de: {row[1]}"
 
     def _on_close(self):
         cfg["pos_x"] = self.root.winfo_x()
@@ -1306,3 +1799,8 @@ class MarvinCompanion:
 # =============================================================================
 if __name__ == "__main__":
     MarvinCompanion().run()
+
+
+
+
+
