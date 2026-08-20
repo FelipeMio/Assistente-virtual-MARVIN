@@ -1,6 +1,8 @@
 ﻿import tkinter as tk
 import threading, math, time, datetime, random, sys, textwrap
 from tkinter import messagebox
+from pathlib import Path
+from PIL import Image, ImageTk
 
 from .config import load_cfg, save_cfg
 
@@ -1454,6 +1456,13 @@ class MarvinCompanion:
                              bg=TK, highlightthickness=0)
         self.cv.pack()
 
+        # Sprites do MARVIN
+        self._idle_frames = self._load_idle_frames()
+
+        # Controle da piscada
+        self._next_blink = time.monotonic() + random.uniform(3.0, 6.0)
+        self._blink_until = 0.0
+
         # Estado
         self.t               = 0.0
         self.state           = "thinking"
@@ -1516,6 +1525,87 @@ class MarvinCompanion:
 
         threading.Thread(target=db_limpar_antigas, daemon=True).start()
         self.root.after(900, self._saudacao_inicial)
+
+    # ── Sprites ────────────────────────────────────────────────────────────────
+
+    def _load_idle_frames(self):
+        pasta = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+            / "idle"
+        )
+
+        arquivos = [
+            pasta / "01.png",
+            pasta / "02.png",
+        ]
+
+        frames = []
+
+        for arquivo in arquivos:
+            if not arquivo.exists():
+                print(f"[MARVIN] Sprite nao encontrado: {arquivo}")
+                continue
+
+            imagem = Image.open(arquivo).convert("RGBA")
+
+            imagem = imagem.resize(
+                (150, 150),
+                Image.Resampling.NEAREST
+            )
+
+            frame = ImageTk.PhotoImage(imagem)
+            frames.append(frame)
+
+        print(
+            f"[MARVIN] {len(frames)} frame(s) idle carregado(s)."
+        )
+
+        return frames
+
+    def _draw_idle_sprite(self):
+        if not self._idle_frames:
+            return None
+
+        now = time.monotonic()
+
+        # Comeca uma piscada nova
+        if now >= self._next_blink and now >= self._blink_until:
+            self._blink_until = now + 0.14
+            self._next_blink = now + random.uniform(3.0, 6.0)
+
+        # Frame 02 enquanto estiver piscando
+        if (
+            now < self._blink_until
+            and len(self._idle_frames) >= 2
+        ):
+            frame = self._idle_frames[1]
+
+        # Frame 01 normalmente
+        else:
+            frame = self._idle_frames[0]
+
+        self.cv.delete("all")
+
+        bob = int(math.sin(self.t * 1.4) * 3)
+
+        x = self.W // 2
+        bottom_y = self.H - 8 + bob
+
+        sprite_w = frame.width()
+        sprite_h = frame.height()
+
+        top_y = bottom_y - sprite_h
+
+        self.cv.create_image(
+            x,
+            bottom_y,
+            image=frame,
+            anchor="s"
+        )
+
+        return top_y
 
     # ── Nao Perturbe ─────────────────────────────────────────────────────────
 
@@ -1608,12 +1698,32 @@ class MarvinCompanion:
                 if not self._reminder_queue:
                     self.state = "idle"
 
-        draw_cat(self.cv, self.t, self.state, self.W, self.H)
+        # Usa os novos sprites no estado normal.
+        # Outros estados ainda usam o desenho antigo como fallback.
+        if (
+            self.state in ("idle", "talking")
+            and self._idle_frames
+        ):
+            top_y = self._draw_idle_sprite()
+
+        else:
+            draw_cat(
+                self.cv,
+                self.t,
+                self.state,
+                self.W,
+                self.H
+            )
+
+            bob = math.sin(self.t * 1.4) * 3
+            top_y = int(
+                self.H
+                - CAT_ROWS * PX
+                - 8
+                + bob
+            )
 
         if self.bubble:
-            bob = math.sin(self.t * 1.4) * 3
-            top_y = int(self.H - CAT_ROWS * PX - 8 + bob)
-
             draw_bubble(
                 self.cv,
                 self.t,
