@@ -706,8 +706,14 @@ class NewTaskWindow:
         tk.Label(Lf, text="Data (DD/MM/AAAA) *",
                   bg=C["win_bg"], fg=C["dim"],
                   font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
+        proximo_minuto = (
+            datetime.datetime.now()
+            .replace(second=0, microsecond=0)
+            + datetime.timedelta(minutes=1)
+        )
+
         self.v_data = tk.StringVar(
-            value=datetime.date.today().strftime("%d/%m/%Y"))
+            value=proximo_minuto.strftime("%d/%m/%Y"))
         self.e_data = tk.Entry(Lf, textvariable=self.v_data,
                                 bg=C["panel"], fg=C["text"],
                                 insertbackground=C["accent"],
@@ -719,7 +725,7 @@ class NewTaskWindow:
                   bg=C["win_bg"], fg=C["dim"],
                   font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
         self.v_hora = tk.StringVar(
-            value=datetime.datetime.now().strftime("%H:%M"))
+            value=proximo_minuto.strftime("%H:%M"))
         self.e_hora = tk.Entry(Rf, textvariable=self.v_hora,
                                 bg=C["panel"], fg=C["text"],
                                 insertbackground=C["accent"],
@@ -788,6 +794,24 @@ class NewTaskWindow:
 
         if hora is None:
             self.v_err.set("Horario invalido. Use HH:MM.")
+            return
+
+        # Nao permite criar tarefa no minuto atual ou no passado.
+        agora = datetime.datetime.now()
+
+        try:
+            task_dt = datetime.datetime.strptime(
+                f"{data} {hora}",
+                "%Y-%m-%d %H:%M"
+            )
+        except ValueError:
+            self.v_err.set("Data ou horario invalido.")
+            return
+
+        if task_dt <= agora:
+            self.v_err.set(
+                "Escolha um horario a partir do proximo minuto."
+            )
             return
 
         db_criar(
@@ -1630,6 +1654,7 @@ class MarvinCompanion:
         # Sprites do MARVIN
         self._idle_frames = self._load_idle_frames()
         self._alert_frames = self._load_alert_frames()
+        self._happy_frame = self._load_happy_frame()
 
         # Controle da piscada
         self._next_blink = time.monotonic() + random.uniform(3.0, 6.0)
@@ -1777,6 +1802,32 @@ class MarvinCompanion:
         return frames
 
 
+    def _load_happy_frame(self):
+        arquivo = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+            / "happy"
+            / "01.png"
+        )
+
+        if not arquivo.exists():
+            print(f"[MARVIN] Sprite happy nao encontrado: {arquivo}")
+            return None
+
+        imagem = Image.open(arquivo).convert("RGBA")
+        imagem = imagem.resize(
+            (150, 150),
+            Image.Resampling.NEAREST
+        )
+
+        frame = ImageTk.PhotoImage(imagem)
+
+        print("[MARVIN] frame happy carregado.")
+
+        return frame
+
+
     def _draw_idle_sprite(self):
         if not self._idle_frames:
             return None
@@ -1819,6 +1870,30 @@ class MarvinCompanion:
         )
 
         return top_y
+
+    def _draw_happy_sprite(self):
+        if self._happy_frame is None:
+            return None
+
+        frame = self._happy_frame
+
+        self.cv.delete("all")
+
+        bob = int(math.sin(self.t * 1.4) * 3)
+
+        x = self.W // 2
+        bottom_y = self.H - 8 + bob
+        top_y = bottom_y - frame.height()
+
+        self.cv.create_image(
+            x,
+            bottom_y,
+            image=frame,
+            anchor="s"
+        )
+
+        return top_y
+
 
     def _draw_alert_sprite(self):
         if not self._alert_frames:
@@ -1908,12 +1983,22 @@ class MarvinCompanion:
     def complete_task(self):
         if self._reminder_queue:
             db_concluir(self._reminder_queue[0][0])
+
         self._next_reminder()
+
         streak = db_streak_hoje()
         msg = "Tarefa concluida!"
+
         if streak and streak % 5 == 0:
             msg += f"  {streak} hoje!"
-        self.say(msg, "talking", 3000)
+
+        # Se houver outro lembrete na fila,
+        # mantem o proximo alerta visivel.
+        if self._reminder_queue:
+            return
+
+        # Caso contrario, comemora por 3 segundos.
+        self.say(msg, "happy", 3000)
 
     def _next_reminder(self):
         if self._reminder_queue:
@@ -1961,6 +2046,13 @@ class MarvinCompanion:
             and self._alert_frames
         ):
             top_y = self._draw_alert_sprite()
+
+        # Sprite feliz
+        elif (
+            self.state == "happy"
+            and self._happy_frame is not None
+        ):
+            top_y = self._draw_happy_sprite()
 
         # Sprite normal
         elif (
