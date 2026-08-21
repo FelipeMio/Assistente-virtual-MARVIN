@@ -1,5 +1,5 @@
 import tkinter as tk
-import threading, math, time, datetime, random, sys, textwrap
+import threading, math, time, datetime, random, sys, textwrap, os
 from tkinter import messagebox
 from pathlib import Path
 from PIL import Image, ImageTk
@@ -41,6 +41,105 @@ def _beep():
             print("\a", end="", flush=True)
     except Exception:
         pass
+
+
+#  INICIALIZACAO COM O WINDOWS
+
+
+def _startup_file():
+    """
+    Retorna o arquivo usado para iniciar
+    o MARVIN automaticamente com o Windows.
+    """
+    if sys.platform != "win32":
+        return None
+
+    appdata = os.environ.get("APPDATA")
+
+    if not appdata:
+        return None
+
+    return (
+        Path(appdata)
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs"
+        / "Startup"
+        / "MARVIN.cmd"
+    )
+
+
+def _startup_enabled():
+    arquivo = _startup_file()
+
+    return bool(
+        arquivo
+        and arquivo.exists()
+    )
+
+
+def _set_startup_enabled(enabled):
+    """
+    Cria ou remove o atalho de inicializacao
+    automatica do MARVIN.
+    """
+    arquivo = _startup_file()
+
+    if arquivo is None:
+        return False
+
+    try:
+        if enabled:
+            # Estrutura:
+            # projeto/
+            #   marvin/
+            #       main.py
+            projeto = (
+                Path(__file__)
+                .resolve()
+                .parent
+                .parent
+            )
+
+            python_exe = Path(sys.executable)
+
+            # Usa pythonw para nao abrir o terminal
+            # quando o Windows iniciar o MARVIN.
+            pythonw = python_exe.with_name(
+                "pythonw.exe"
+            )
+
+            if not pythonw.exists():
+                pythonw = python_exe
+
+            conteudo = (
+                "@echo off\n"
+                f'cd /d "{projeto}"\n'
+                f'start "" "{pythonw}" -m marvin.main\n'
+            )
+
+            arquivo.parent.mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
+            arquivo.write_text(
+                conteudo,
+                encoding="utf-8"
+            )
+
+        else:
+            if arquivo.exists():
+                arquivo.unlink()
+
+        return True
+
+    except Exception as exc:
+        print(
+            f"[MARVIN] Erro ao configurar inicio com Windows: {exc}"
+        )
+        return False
 
 
 #  PALETA
@@ -1178,7 +1277,7 @@ class EditTaskWindow:
 class SettingsWindow:
     def __init__(self, parent, companion):
         self.comp = companion
-        self.win  = _make_win(parent, "Configuracoes", 400, 650)
+        self.win  = _make_win(parent, "Configuracoes", 400, 690)
         self.win.grab_set()
         self._build()
         _position_near_marvin(self.win, self.comp)
@@ -1200,6 +1299,38 @@ class SettingsWindow:
         tk.Label(r2, text="Som ao receber lembrete",
                   bg=C["win_bg"], fg=C["text"],
                   font=("Consolas", 9)).pack(side="left")
+
+        # Iniciar MARVIN junto com o Windows
+        self.v_startup = tk.BooleanVar(
+            value=_startup_enabled()
+        )
+
+        r_startup = tk.Frame(
+            body,
+            bg=C["win_bg"]
+        )
+
+        r_startup.pack(
+            fill="x",
+            pady=4
+        )
+
+        tk.Checkbutton(
+            r_startup,
+            variable=self.v_startup,
+            bg=C["win_bg"],
+            selectcolor=C["panel"],
+            activebackground=C["win_bg"],
+            cursor="hand2"
+        ).pack(side="left")
+
+        tk.Label(
+            r_startup,
+            text="Iniciar MARVIN com o Windows",
+            bg=C["win_bg"],
+            fg=C["text"],
+            font=("Consolas", 9)
+        ).pack(side="left")
 
         # Tamanho dos sprites
         tk.Frame(
@@ -1438,6 +1569,18 @@ class SettingsWindow:
         )
 
         save_cfg(cfg)
+
+        # Ativa ou desativa a inicializacao
+        # automatica junto com o Windows.
+        startup_ok = _set_startup_enabled(
+            self.v_startup.get()
+        )
+
+        if not startup_ok:
+            messagebox.showwarning(
+                "MARVIN",
+                "Nao foi possivel alterar a inicializacao com o Windows."
+            )
 
         self.comp._reload_sprites()
 
@@ -1952,6 +2095,13 @@ class MarvinCompanion:
 
         # Momento em que o lembrete atual apareceu.
         self._reminder_started_at = None
+
+        # Estagio da reacao ao ignorar o lembrete.
+        # 0 = normal
+        # 1 = waiting 01
+        # 2 = waiting 02
+        # 3 = waiting 03
+        self._waiting_reaction_stage = 0
 
         # Controle do modo compacto / Nao Perturbe
         self._compact_mode = False
@@ -2540,6 +2690,53 @@ class MarvinCompanion:
         return top_y
 
 
+    def _update_waiting_reaction(self):
+        """Atualiza a fala enquanto o lembrete e ignorado."""
+
+        if (
+            not self._reminder_queue
+            or self._bubble_mode != "alert"
+            or self._reminder_started_at is None
+        ):
+            return
+
+        tempo = (
+            time.monotonic()
+            - self._reminder_started_at
+        )
+
+        t1, t2, t3 = self.WAITING_TIMES
+
+        if tempo >= t3:
+            stage = 3
+        elif tempo >= t2:
+            stage = 2
+        elif tempo >= t1:
+            stage = 1
+        else:
+            stage = 0
+
+        if stage == self._waiting_reaction_stage:
+            return
+
+        self._waiting_reaction_stage = stage
+
+        tarefa = self._reminder_queue[0][1]
+
+        if stage == 1:
+            self.bubble = f"Ei... {tarefa}"
+
+        elif stage == 2:
+            self.bubble = (
+                f"Vai fazer ou adiar? {tarefa}"
+            )
+
+        elif stage == 3:
+            self.bubble = (
+                f"Ainda estou esperando: {tarefa}"
+            )
+
+
     def _draw_reminder_sprite(self):
         """
         Escolhe o sprite do lembrete conforme
@@ -2725,6 +2922,7 @@ class MarvinCompanion:
 
             # Nova tarefa = novo contador de espera.
             self._reminder_started_at = time.monotonic()
+            self._waiting_reaction_stage = 0
 
             self.state = "alert"
             self.b_timer = 0
@@ -2735,6 +2933,7 @@ class MarvinCompanion:
 
         else:
             self._reminder_started_at = None
+            self._waiting_reaction_stage = 0
             self.state = "idle"
             self.bubble = ""
             self.b_timer = 0
@@ -2767,6 +2966,8 @@ class MarvinCompanion:
             return
 
         now = time.monotonic()
+
+        self._update_waiting_reaction()
 
         # Bocejo aleatorio somente quando MARVIN esta livre
         if (
@@ -3000,6 +3201,7 @@ class MarvinCompanion:
                 # O usuario respondeu ao alerta,
                 # portanto nao continua ficando impaciente.
                 self._reminder_started_at = None
+                self._waiting_reaction_stage = 0
 
                 self._bubble_mode = "snooze"
                 self._bubble_hover = None
@@ -3030,6 +3232,7 @@ class MarvinCompanion:
                 # Voltou sem escolher adiamento:
                 # comeca novamente a contar a espera.
                 self._reminder_started_at = time.monotonic()
+                self._waiting_reaction_stage = 0
 
                 self._bubble_mode = "alert"
                 self._bubble_hover = None
@@ -3164,6 +3367,7 @@ class MarvinCompanion:
         # Comeca agora a contar quanto tempo
         # o usuario demora para responder.
         self._reminder_started_at = time.monotonic()
+        self._waiting_reaction_stage = 0
         
         self._bubble_mode = "alert"
         self._bubble_hover = None
