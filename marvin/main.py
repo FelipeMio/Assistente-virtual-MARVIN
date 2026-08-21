@@ -1,4 +1,4 @@
-﻿import tkinter as tk
+import tkinter as tk
 import threading, math, time, datetime, random, sys, textwrap
 from tkinter import messagebox
 from pathlib import Path
@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 from .config import load_cfg, save_cfg
 
 from marvin.database import (
+    DB_F,
     db_listar,
     db_criar,
     db_concluir,
@@ -1114,7 +1115,7 @@ class SettingsWindow:
                         bg=C["win_bg"], selectcolor=C["panel"],
                         activebackground=C["win_bg"],
                         cursor="hand2").pack(side="left")
-        tk.Label(r1, text="Modo Nao Perturbe (silencia lembretes)",
+        tk.Label(r1, text="Modo Nao Perturbe (MARVIN fica compacto)",
                   bg=C["win_bg"], fg=C["text"],
                   font=("Consolas", 9)).pack(side="left")
 
@@ -1611,6 +1612,9 @@ class NotifPopup:
 class MarvinCompanion:
     W, H = 180, 260
 
+    COMPACT_W = 100
+    COMPACT_H = 72
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Marvin")
@@ -1655,14 +1659,30 @@ class MarvinCompanion:
         self._idle_frames = self._load_idle_frames()
         self._alert_frames = self._load_alert_frames()
         self._happy_frame = self._load_happy_frame()
+        self._compact_frames = self._load_compact_frames()
+        self._yawn_frames = self._load_yawn_frames()
 
         # Controle da piscada
         self._next_blink = time.monotonic() + random.uniform(3.0, 6.0)
         self._blink_until = 0.0
 
+        # Controle do bocejo
+        self._next_yawn = time.monotonic() + random.uniform(45.0,90.0)
+        self._yawn_index = 0
+        self._yawn_last_frame = 0.0
+        self._yawn_sequence = [0, 1, 1, 1, 0]
+
         # Controle da animacao de alerta
         self._alert_frame_index = 0
         self._alert_last_frame = time.monotonic()
+
+        # Controle do modo compacto / Nao Perturbe
+        self._compact_mode = False
+        self._compact_enabled = False
+        self._compact_frame_index = 0
+        self._compact_last_frame = time.monotonic()
+        self._compact_sequence = [0, 0, 0, 0, 1, 1, 1, 1, 2, 0]
+        self._normal_pos = None
 
         # Estado
         self.t               = 0.0
@@ -1802,6 +1822,128 @@ class MarvinCompanion:
         return frames
 
 
+    def _load_yawn_frames(self):
+        pasta = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+            / "yawn"
+        )
+
+        arquivos = [
+            pasta / "01.png",
+            pasta / "02.png",
+        ]
+
+        frames = []
+
+        for arquivo in arquivos:
+            if not arquivo.exists():
+                print(f"[MARVIN] Sprite yawn nao encontrado: {arquivo}")
+                continue
+
+            imagem = Image.open(arquivo).convert("RGBA")
+
+            imagem = imagem.resize(
+                (150, 150),
+                Image.Resampling.NEAREST
+            )
+
+            frames.append(
+                ImageTk.PhotoImage(imagem)
+            )
+
+        print(
+            f"[MARVIN] {len(frames)} frame(s) yawn carregado(s)."
+        )
+
+        return frames
+
+
+    def _load_compact_frames(self):
+        pasta = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+            / "compact"
+        )
+
+        arquivos = [
+            pasta / "01.png",
+            pasta / "02.png",
+            pasta / "03.png",
+        ]
+
+        imagens = []
+
+        for arquivo in arquivos:
+            if not arquivo.exists():
+                print(
+                    f"[MARVIN] Sprite compact nao encontrado: {arquivo}"
+                )
+                continue
+
+            imagens.append(
+                Image.open(arquivo).convert("RGBA")
+            )
+
+        if not imagens:
+            return []
+
+        # Descobre uma area comum envolvendo todos os pixels visiveis.
+        caixas = []
+
+        for imagem in imagens:
+            bbox = imagem.getchannel("A").getbbox()
+
+            if bbox:
+                caixas.append(bbox)
+
+        if not caixas:
+            return []
+
+        left = min(b[0] for b in caixas)
+        top = min(b[1] for b in caixas)
+        right = max(b[2] for b in caixas)
+        bottom = max(b[3] for b in caixas)
+
+        crop_box = (left, top, right, bottom)
+
+        largura = right - left
+        altura = bottom - top
+
+        max_w = 92
+        max_h = 64
+
+        escala = min(
+            max_w / largura,
+            max_h / altura
+        )
+
+        novo_w = max(1, int(largura * escala))
+        novo_h = max(1, int(altura * escala))
+
+        frames = []
+
+        for imagem in imagens:
+            imagem = imagem.crop(crop_box)
+
+            imagem = imagem.resize(
+                (novo_w, novo_h),
+                Image.Resampling.NEAREST
+            )
+
+            frames.append(
+                ImageTk.PhotoImage(imagem)
+            )
+
+        print(
+            f"[MARVIN] {len(frames)} frame(s) compact carregado(s)."
+        )
+
+        return frames
+
+
     def _load_happy_frame(self):
         arquivo = (
             Path(__file__).resolve().parent
@@ -1871,6 +2013,58 @@ class MarvinCompanion:
 
         return top_y
 
+    def _draw_yawn_sprite(self):
+        if len(self._yawn_frames) < 2:
+            self.state = "idle"
+            self._next_yawn = (
+                time.monotonic()
+                + random.uniform(45.0, 90.0)
+            )
+            return self._draw_idle_sprite()
+
+        now = time.monotonic()
+
+        if self._yawn_last_frame == 0.0:
+            self._yawn_last_frame = now
+
+        # Troca de frame
+        if now - self._yawn_last_frame >= 0.32:
+            self._yawn_index += 1
+            self._yawn_last_frame = now
+
+        # Terminou o bocejo
+        if self._yawn_index >= len(self._yawn_sequence):
+            self.state = "idle"
+            self._yawn_index = 0
+            self._yawn_last_frame = 0.0
+
+            self._next_yawn = (
+                now + random.uniform(45.0, 90.0)
+            )
+
+            return self._draw_idle_sprite()
+
+        indice = self._yawn_sequence[self._yawn_index]
+        frame = self._yawn_frames[indice]
+
+        self.cv.delete("all")
+
+        bob = int(math.sin(self.t * 1.4) * 3)
+
+        x = self.W // 2
+        bottom_y = self.H - 8 + bob
+        top_y = bottom_y - frame.height()
+
+        self.cv.create_image(
+            x,
+            bottom_y,
+            image=frame,
+            anchor="s"
+        )
+
+        return top_y
+
+
     def _draw_happy_sprite(self):
         if self._happy_frame is None:
             return None
@@ -1932,20 +2126,79 @@ class MarvinCompanion:
         return top_y
 
 
+    def _draw_compact_sprite(self):
+        if not self._compact_frames:
+            return None
+
+        now = time.monotonic()
+
+        # 01 -> 02 -> 03 -> 02 -> ...
+        if now - self._compact_last_frame >= 0.35:
+            self._compact_frame_index = (
+                self._compact_frame_index + 1
+            ) % len(self._compact_sequence)
+
+            self._compact_last_frame = now
+
+        indice = self._compact_sequence[
+            self._compact_frame_index
+        ]
+
+        indice = min(
+            indice,
+            len(self._compact_frames) - 1
+        )
+
+        frame = self._compact_frames[indice]
+
+        self.cv.delete("all")
+
+        # Mantem a mesma janela do MARVIN.
+        # Apenas mostra a cabeca no lugar do personagem inteiro.
+        x = self.W // 2
+        bottom_y = self.H - 8
+
+        self.cv.create_image(
+            x,
+            bottom_y,
+            image=frame,
+            anchor="s"
+        )
+
+        return bottom_y - frame.height()
+
+
     # ── Nao Perturbe ─────────────────────────────────────────────────────────
 
     def _np_label(self):
-        if cfg.get("nao_perturbe"):
-            return "Desativar Nao Perturbe"
-        return "Ativar Nao Perturbe"
+        if self._compact_enabled:
+            return "Mostrar MARVIN"
+
+        return "Modo compacto"
 
     def _toggle_np(self):
-        cfg["nao_perturbe"] = not cfg.get("nao_perturbe", False)
-        save_cfg(cfg)
-        # Atualiza o label do item de menu pelo indice (3)
-        self.ctx.entryconfig(3, label=self._np_label())
-        estado = "ativado" if cfg["nao_perturbe"] else "desativado"
-        self.say(f"Nao Perturbe {estado}.", "talking", 2500)
+        self._compact_enabled = not self._compact_enabled
+
+        # Se ativou, mostra imediatamente o modo compacto.
+        if self._compact_enabled:
+            self._compact_mode = True
+        else:
+            self._compact_mode = False
+
+        self.bubble = ""
+        self.b_timer = 0
+        self._bubble_mode = "normal"
+        self._bubble_hover = None
+        self.state = "idle"
+
+        self._compact_frame_index = 0
+        self._compact_last_frame = time.monotonic()
+
+        self.ctx.entryconfig(
+            3,
+            label=self._np_label()
+        )
+
 
     # ── Saudacao ──────────────────────────────────────────────────────────────
 
@@ -1998,7 +2251,7 @@ class MarvinCompanion:
             return
 
         # Caso contrario, comemora por 3 segundos.
-        self.say(msg, "happy", 3000)
+        self.say(msg, "happy", 2000)
 
     def _next_reminder(self):
         if self._reminder_queue:
@@ -2026,6 +2279,39 @@ class MarvinCompanion:
 
     def _animate(self):
         self.t += 0.05
+
+        # Se o usuario escolheu modo compacto e nao existe mais
+        # nenhum alerta/fala, volta automaticamente para a cabeca.
+        if (
+            self._compact_enabled
+            and not self._compact_mode
+            and not self._reminder_queue
+            and self.state == "idle"
+            and not self.bubble
+        ):
+            self._compact_mode = True
+            self._compact_frame_index = 0
+            self._compact_last_frame = time.monotonic()
+
+        # Modo compacto: somente desenha os frames da cabeca.
+        if self._compact_mode:
+            self._draw_compact_sprite()
+            self.root.after(50, self._animate)
+            return
+
+        now = time.monotonic()
+
+        # Bocejo aleatorio somente quando MARVIN esta livre
+        if (
+            self.state == "idle"
+            and not self.bubble
+            and not self._reminder_queue
+            and self._yawn_frames
+            and now >= self._next_yawn
+        ):
+            self.state = "yawn"
+            self._yawn_index = 0
+            self._yawn_last_frame = now
         if self.b_timer > 0:
             self.b_timer -= 50
 
@@ -2053,6 +2339,13 @@ class MarvinCompanion:
             and self._happy_frame is not None
         ):
             top_y = self._draw_happy_sprite()
+
+        # Bocejo
+        elif (
+            self.state == "yawn"
+            and self._yawn_frames
+        ):
+            top_y = self._draw_yawn_sprite()
 
         # Sprite normal
         elif (
@@ -2356,6 +2649,12 @@ class MarvinCompanion:
                 95000,
                 lambda i=tid: db_reset_lembrado(i)
             )
+
+        # Se o usuario estiver usando modo compacto,
+        # mostra temporariamente o MARVIN inteiro durante o alerta.
+        # A preferencia _compact_enabled continua ativa.
+        if self._compact_enabled:
+            self._compact_mode = False
 
         self._reminder_queue.append(row)
         
