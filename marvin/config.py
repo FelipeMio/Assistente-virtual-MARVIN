@@ -1,4 +1,4 @@
-import json
+﻿import json
 from pathlib import Path
 
 
@@ -14,6 +14,8 @@ CFG_DEFAULTS = {
     "nao_perturbe": False,
     "som": True,
     "opacidade": 1.0,
+    "tamanho_normal": 90,
+    "tamanho_compacto": 85,
 }
 
 
@@ -33,3 +35,4 @@ def save_cfg(cfg):
         json.dumps(cfg, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+

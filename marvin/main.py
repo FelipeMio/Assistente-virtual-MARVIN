@@ -778,6 +778,23 @@ class NewTaskWindow:
             fg=C["text"] if h_ok else C["red"]
         )
 
+    def _preview_size(self, chave, valor):
+        try:
+            valor = int(float(valor))
+        except (TypeError, ValueError):
+            return
+
+        cfg[chave] = valor
+        save_cfg(cfg)
+
+        try:
+            self.comp._reload_sprites()
+        except Exception as exc:
+            print(
+                f"[MARVIN] Erro ao atualizar tamanho: {exc}"
+            )
+
+
     def _salvar(self):
         txt = self.v_txt.get().strip()
         desc = self.v_desc.get().strip()
@@ -1096,7 +1113,7 @@ class EditTaskWindow:
 class SettingsWindow:
     def __init__(self, parent, companion):
         self.comp = companion
-        self.win  = _make_win(parent, "Configuracoes", 400, 310)
+        self.win  = _make_win(parent, "Configuracoes", 400, 440)
         self.win.grab_set()
         self._build()
         _position_near_marvin(self.win, self.comp)
@@ -1130,6 +1147,71 @@ class SettingsWindow:
         tk.Label(r2, text="Som ao receber lembrete",
                   bg=C["win_bg"], fg=C["text"],
                   font=("Consolas", 9)).pack(side="left")
+
+        # Tamanho dos sprites
+        tk.Frame(
+            body,
+            bg=C["border"],
+            height=1
+        ).pack(fill="x", pady=10)
+
+        tk.Label(
+            body,
+            text="Tamanho do MARVIN",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8, "bold")
+        ).pack(anchor="w")
+
+        self.v_size_normal = tk.IntVar(
+            value=cfg.get("tamanho_normal", 100)
+        )
+
+        tk.Scale(
+            body,
+            variable=self.v_size_normal,
+            from_=60,
+            to=120,
+            resolution=5,
+            orient="horizontal",
+            bg=C["win_bg"],
+            fg=C["text"],
+            troughcolor=C["panel"],
+            highlightthickness=0,
+            activebackground=C["accent"],
+            command=lambda value: self._preview_size(
+                "tamanho_normal", value
+            )
+        ).pack(fill="x", pady=(0, 8))
+
+        tk.Label(
+            body,
+            text="Tamanho no modo compacto",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8, "bold")
+        ).pack(anchor="w")
+
+        self.v_size_compact = tk.IntVar(
+            value=cfg.get("tamanho_compacto", 85)
+        )
+
+        tk.Scale(
+            body,
+            variable=self.v_size_compact,
+            from_=60,
+            to=120,
+            resolution=5,
+            orient="horizontal",
+            bg=C["win_bg"],
+            fg=C["text"],
+            troughcolor=C["panel"],
+            highlightthickness=0,
+            activebackground=C["accent"],
+            command=lambda value: self._preview_size(
+                "tamanho_compacto", value
+            )
+        ).pack(fill="x", pady=(0, 8))
 
         # Opacidade
         tk.Frame(body, bg=C["border"], height=1).pack(fill="x", pady=10)
@@ -1169,11 +1251,40 @@ class SettingsWindow:
                    activeforeground=C["win_bg"],
                    command=self._salvar).pack(anchor="w", pady=10)
 
+    def _preview_size(self, chave, valor):
+        try:
+            valor = int(float(valor))
+        except (TypeError, ValueError):
+            return
+
+        cfg[chave] = valor
+        save_cfg(cfg)
+
+        try:
+            self.comp._reload_sprites()
+        except Exception as exc:
+            print(
+                f"[MARVIN] Erro ao atualizar tamanho: {exc}"
+            )
+
+
     def _salvar(self):
         cfg["nao_perturbe"] = self.v_np.get()
         cfg["som"]          = self.v_som.get()
         cfg["opacidade"]    = round(self.v_op.get(), 2)
+
+        cfg["tamanho_normal"] = int(
+            self.v_size_normal.get()
+        )
+
+        cfg["tamanho_compacto"] = int(
+            self.v_size_compact.get()
+        )
+
         save_cfg(cfg)
+
+        self.comp._reload_sprites()
+
         try:
             self.comp.root.attributes("-alpha", cfg["opacidade"])
         except Exception:
@@ -1749,6 +1860,46 @@ class MarvinCompanion:
 
     # ── Sprites ────────────────────────────────────────────────────────────────
 
+    def _normal_sprite_size(self):
+        percentual = int(
+            cfg.get("tamanho_normal", 100)
+        )
+
+        percentual = max(
+            60,
+            min(120, percentual)
+        )
+
+        return max(
+            1,
+            int(150 * percentual / 100)
+        )
+
+
+    def _compact_sprite_scale(self):
+        percentual = int(
+            cfg.get("tamanho_compacto", 85)
+        )
+
+        percentual = max(
+            60,
+            min(120, percentual)
+        )
+
+        return percentual / 100.0
+
+
+    def _reload_sprites(self):
+        self._idle_frames = self._load_idle_frames()
+        self._alert_frames = self._load_alert_frames()
+        self._happy_frame = self._load_happy_frame()
+        self._compact_frames = self._load_compact_frames()
+        self._yawn_frames = self._load_yawn_frames()
+
+        self._alert_frame_index = 0
+        self._compact_frame_index = 0
+
+
     def _load_idle_frames(self):
         pasta = (
             Path(__file__).resolve().parent
@@ -1771,8 +1922,10 @@ class MarvinCompanion:
 
             imagem = Image.open(arquivo).convert("RGBA")
 
+            tamanho = self._normal_sprite_size()
+
             imagem = imagem.resize(
-                (150, 150),
+                (tamanho, tamanho),
                 Image.Resampling.NEAREST
             )
 
@@ -1807,8 +1960,10 @@ class MarvinCompanion:
 
             imagem = Image.open(arquivo).convert("RGBA")
 
+            tamanho = self._normal_sprite_size()
+
             imagem = imagem.resize(
-                (150, 150),
+                (tamanho, tamanho),
                 Image.Resampling.NEAREST
             )
 
@@ -1844,8 +1999,10 @@ class MarvinCompanion:
 
             imagem = Image.open(arquivo).convert("RGBA")
 
+            tamanho = self._normal_sprite_size()
+
             imagem = imagem.resize(
-                (150, 150),
+                (tamanho, tamanho),
                 Image.Resampling.NEAREST
             )
 
@@ -1912,8 +2069,17 @@ class MarvinCompanion:
         largura = right - left
         altura = bottom - top
 
-        max_w = 92
-        max_h = 64
+        compact_scale = self._compact_sprite_scale()
+
+        max_w = max(
+            1,
+            int(92 * compact_scale)
+        )
+
+        max_h = max(
+            1,
+            int(64 * compact_scale)
+        )
 
         escala = min(
             max_w / largura,
@@ -1958,8 +2124,10 @@ class MarvinCompanion:
             return None
 
         imagem = Image.open(arquivo).convert("RGBA")
+        tamanho = self._normal_sprite_size()
+
         imagem = imagem.resize(
-            (150, 150),
+            (tamanho, tamanho),
             Image.Resampling.NEAREST
         )
 
