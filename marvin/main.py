@@ -828,23 +828,6 @@ class NewTaskWindow:
             fg=C["text"] if h_ok else C["red"]
         )
 
-    def _preview_size(self, chave, valor):
-        try:
-            valor = int(float(valor))
-        except (TypeError, ValueError):
-            return
-
-        cfg[chave] = valor
-        save_cfg(cfg)
-
-        try:
-            self.comp._reload_sprites()
-        except Exception as exc:
-            print(
-                f"[MARVIN] Erro ao atualizar tamanho: {exc}"
-            )
-
-
     def _salvar(self):
         txt = self.v_txt.get().strip()
         desc = self.v_desc.get().strip()
