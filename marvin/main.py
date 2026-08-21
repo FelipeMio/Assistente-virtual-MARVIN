@@ -590,6 +590,53 @@ def _validate_time(s):
     except ValueError:
         return None
 
+def _bind_auto_time(var):
+    """
+    Permite digitar horario somente com numeros.
+
+    Exemplo:
+        1830 -> 18:30
+        0745 -> 07:45
+    """
+
+    controle = {"alterando": False}
+
+    def formatar(*_):
+        if controle["alterando"]:
+            return
+
+        atual = var.get()
+
+        # Mantem somente numeros e no maximo HHMM.
+        digitos = "".join(
+            ch for ch in atual
+            if ch.isdigit()
+        )[:4]
+
+        # O ":" aparece automaticamente quando
+        # o usuario comeca a digitar os minutos.
+        if len(digitos) <= 2:
+            novo = digitos
+        else:
+            novo = (
+                digitos[:2]
+                + ":"
+                + digitos[2:]
+            )
+
+        if novo == atual:
+            return
+
+        controle["alterando"] = True
+
+        try:
+            var.set(novo)
+        finally:
+            controle["alterando"] = False
+
+    var.trace_add("write", formatar)
+
+
 #  JANELA: NOVA TAREFA
 
 class NewTaskWindow:
@@ -733,6 +780,9 @@ class NewTaskWindow:
                                 font=("Consolas", 9), bd=0, relief="flat",
                                 width=7)
         self.e_hora.pack(ipady=6)
+
+        # Digitar 1830 vira automaticamente 18:30.
+        _bind_auto_time(self.v_hora)
 
         self.v_data.trace_add("write", self._validate_live)
         self.v_hora.trace_add("write", self._validate_live)
@@ -1065,6 +1115,9 @@ class EditTaskWindow:
                   font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
         self.v_hora = tk.StringVar(value=hora[:5])
         _entry(Rf, self.v_hora, width=7)
+
+        # Digitar 1830 vira automaticamente 18:30.
+        _bind_auto_time(self.v_hora)
 
         _lbl(body, "Repeticao")
         self.v_rep = tk.StringVar(value=rep)
