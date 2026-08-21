@@ -1,8 +1,13 @@
 import tkinter as tk
-import threading, math, time, datetime, random, sys, textwrap, os
+import threading, math, time, datetime, random, sys, textwrap, os, queue
 from tkinter import messagebox
 from pathlib import Path
 from PIL import Image, ImageTk
+
+try:
+    import pystray
+except ImportError:
+    pystray = None
 
 from .config import load_cfg, save_cfg
 
@@ -2125,6 +2130,18 @@ class MarvinCompanion:
         self._bubble_hover = None
         self._drag_dist      = 0
         self._dx = self._dy  = 0
+
+        # Bandeja do Windows
+        self._tray_icon = None
+        self._tray_actions = queue.Queue()
+        self._is_hidden = False
+
+        # Processa comandos vindos do icone da bandeja
+        # sempre pela thread principal do Tkinter.
+        self.root.after(
+            100,
+            self._process_tray_actions
+        )
         
         
 
@@ -2138,7 +2155,7 @@ class MarvinCompanion:
         self.cv.bind("<ButtonRelease-1>", self._drag_end)
         self.cv.bind("<Button-3>",        self._show_menu)
     
-        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self._hide_marvin)
         self.root.bind_all("<Control-Shift-N>",
                             lambda e: NewTaskWindow(self.root, self))
 
@@ -2165,14 +2182,277 @@ class MarvinCompanion:
             command=lambda: SettingsWindow(self.root, self))         # indice 5
         self.ctx.add_separator()                                     # indice 6
         self.ctx.add_command(
-            label="Fechar Marvin",
-            command=self._on_close)                                  # indice 7
+            label="Ocultar MARVIN",
+            command=self._hide_marvin)                               # indice 7
+
+        self.ctx.add_separator()                                     # indice 8
+
+        self.ctx.add_command(
+            label="Sair",
+            command=self._on_close)                                  # indice 9
+
+        self._start_tray()
 
         self._animate()
         self._start_reminders()
 
         threading.Thread(target=db_limpar_antigas, daemon=True).start()
         self.root.after(900, self._saudacao_inicial)
+
+    # ── Bandeja do Windows ─────────────────────────────────────────────────
+
+    def _tray_dispatch(self, callback):
+        """
+        O pystray roda em outra thread.
+        Apenas coloca a acao na fila; o Tkinter
+        executa depois na thread principal.
+        """
+        self._tray_actions.put(callback)
+
+
+    def _process_tray_actions(self):
+        try:
+            while True:
+                callback = self._tray_actions.get_nowait()
+
+                try:
+                    callback()
+                except Exception as exc:
+                    print(
+                        f"[MARVIN] Erro em acao da bandeja: {exc}"
+                    )
+
+        except queue.Empty:
+            pass
+
+        try:
+            self.root.after(
+                100,
+                self._process_tray_actions
+            )
+        except tk.TclError:
+            pass
+
+
+    def _tray_image(self):
+        """
+        Usa um sprite existente do MARVIN
+        como icone da bandeja.
+        """
+        base = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+        )
+
+        arquivos = [
+            base / "compact" / "01.png",
+            base / "idle" / "01.png",
+        ]
+
+        for arquivo in arquivos:
+            if not arquivo.exists():
+                continue
+
+            try:
+                imagem = Image.open(
+                    arquivo
+                ).convert("RGBA")
+
+                bbox = imagem.getchannel("A").getbbox()
+
+                if bbox:
+                    imagem = imagem.crop(bbox)
+
+                imagem.thumbnail(
+                    (56, 56),
+                    Image.Resampling.NEAREST
+                )
+
+                canvas = Image.new(
+                    "RGBA",
+                    (64, 64),
+                    (0, 0, 0, 0)
+                )
+
+                x = (
+                    64 - imagem.width
+                ) // 2
+
+                y = (
+                    64 - imagem.height
+                ) // 2
+
+                canvas.paste(
+                    imagem,
+                    (x, y),
+                    imagem
+                )
+
+                return canvas
+
+            except Exception as exc:
+                print(
+                    f"[MARVIN] Erro ao carregar icone: {exc}"
+                )
+
+        return None
+
+
+    def _start_tray(self):
+        if pystray is None:
+            print(
+                "[MARVIN] pystray nao instalado. "
+                "Bandeja desativada."
+            )
+            return
+
+        if sys.platform != "win32":
+            return
+
+        imagem = self._tray_image()
+
+        if imagem is None:
+            print(
+                "[MARVIN] Nao foi possivel criar "
+                "o icone da bandeja."
+            )
+            return
+
+        menu = pystray.Menu(
+
+            pystray.MenuItem(
+                "Mostrar MARVIN",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._show_marvin
+                    ),
+                default=True
+            ),
+
+            pystray.MenuItem(
+                "Nova tarefa",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._tray_new_task
+                    )
+            ),
+
+            pystray.MenuItem(
+                "Ver tarefas",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._tray_tasks
+                    )
+            ),
+
+            pystray.Menu.SEPARATOR,
+
+            pystray.MenuItem(
+                "Modo compacto",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._toggle_np
+                    ),
+                checked=lambda item:
+                    self._compact_enabled
+            ),
+
+            pystray.Menu.SEPARATOR,
+
+            pystray.MenuItem(
+                "Configuracoes",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._tray_settings
+                    )
+            ),
+
+            pystray.Menu.SEPARATOR,
+
+            pystray.MenuItem(
+                "Sair",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._on_close
+                    )
+            ),
+        )
+
+        self._tray_icon = pystray.Icon(
+            "MARVIN",
+            imagem,
+            "MARVIN",
+            menu
+        )
+
+        self._tray_icon.run_detached()
+
+        print(
+            "[MARVIN] Icone da bandeja iniciado."
+        )
+
+
+    def _show_marvin(self):
+        try:
+            self.root.deiconify()
+            self.root.lift()
+
+            self.root.attributes(
+                "-topmost",
+                True
+            )
+
+            self._is_hidden = False
+
+        except tk.TclError:
+            pass
+
+
+    def _hide_marvin(self):
+        """
+        Esconde o personagem, mas mantem
+        lembretes e bandeja funcionando.
+        """
+        try:
+            cfg["pos_x"] = self.root.winfo_x()
+            cfg["pos_y"] = self.root.winfo_y()
+
+            save_cfg(cfg)
+
+            self.root.withdraw()
+            self._is_hidden = True
+
+        except tk.TclError:
+            pass
+
+
+    def _tray_new_task(self):
+        self._show_marvin()
+
+        NewTaskWindow(
+            self.root,
+            self
+        )
+
+
+    def _tray_tasks(self):
+        self._show_marvin()
+
+        TaskWindow(
+            self.root,
+            self
+        )
+
+
+    def _tray_settings(self):
+        self._show_marvin()
+
+        SettingsWindow(
+            self.root,
+            self
+        )
+
 
     # ── Sprites ────────────────────────────────────────────────────────────────
 
@@ -2851,6 +3131,13 @@ class MarvinCompanion:
             label=self._np_label()
         )
 
+        # Atualiza a marcacao no menu da bandeja.
+        if self._tray_icon is not None:
+            try:
+                self._tray_icon.update_menu()
+            except Exception:
+                pass
+
 
     # ── Saudacao ──────────────────────────────────────────────────────────────
 
@@ -3360,6 +3647,9 @@ class MarvinCompanion:
         if not was_empty:
             return
 
+        # Se estava escondido, reaparece para o lembrete.
+        self._show_marvin()
+
         # Som do lembrete.
         if cfg.get("som", True):
             _beep()
@@ -3379,10 +3669,27 @@ class MarvinCompanion:
         self.bubble = f"Hora de: {row[1]}"
 
     def _on_close(self):
-        cfg["pos_x"] = self.root.winfo_x()
-        cfg["pos_y"] = self.root.winfo_y()
-        save_cfg(cfg)
-        self.root.destroy()
+        """Encerra completamente o MARVIN."""
+
+        try:
+            cfg["pos_x"] = self.root.winfo_x()
+            cfg["pos_y"] = self.root.winfo_y()
+            save_cfg(cfg)
+        except Exception:
+            pass
+
+        if self._tray_icon is not None:
+            try:
+                self._tray_icon.stop()
+            except Exception:
+                pass
+
+            self._tray_icon = None
+
+        try:
+            self.root.destroy()
+        except tk.TclError:
+            pass
 
     def run(self):
         self.root.mainloop()
