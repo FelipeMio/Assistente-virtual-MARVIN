@@ -1225,7 +1225,8 @@ class SettingsWindow:
                   bg=C["win_bg"], fg=C["text"],
                   troughcolor=C["panel"],
                   highlightthickness=0,
-                  activebackground=C["accent"]
+                  activebackground=C["accent"],
+                  command=self._preview_opacity
                   ).pack(fill="x", pady=4)
 
         # Limpeza
@@ -1265,6 +1266,31 @@ class SettingsWindow:
         except Exception as exc:
             print(
                 f"[MARVIN] Erro ao atualizar tamanho: {exc}"
+            )
+
+
+    def _preview_opacity(self, valor):
+        try:
+            valor = float(valor)
+        except (TypeError, ValueError):
+            return
+
+        valor = max(
+            0.3,
+            min(1.0, valor)
+        )
+
+        cfg["opacidade"] = round(valor, 2)
+        save_cfg(cfg)
+
+        try:
+            self.comp.root.attributes(
+                "-alpha",
+                valor
+            )
+        except Exception as exc:
+            print(
+                f"[MARVIN] Erro ao alterar opacidade: {exc}"
             )
 
 
