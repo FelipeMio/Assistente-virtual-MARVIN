@@ -2608,8 +2608,28 @@ class MarvinCompanion:
         if not self.bubble:
             return None
 
-        bob = math.sin(self.t * 1.4) * 3
-        top_y = int(self.H - CAT_ROWS * PX - 8 + bob)
+        # Usa a altura REAL do sprite de alerta.
+        # Isso mantem a area clicavel exatamente no mesmo lugar
+        # do balao, mesmo quando o tamanho do MARVIN e alterado.
+        bob = int(math.sin(self.t * 1.4) * 3)
+
+        if self._alert_frames:
+            sprite_h = self._alert_frames[0].height()
+
+            top_y = (
+                self.H
+                - 8
+                + bob
+                - sprite_h
+            )
+        else:
+            # Fallback para a pixel art antiga.
+            top_y = int(
+                self.H
+                - CAT_ROWS * PX
+                - 8
+                + bob
+            )
 
         wrapped = textwrap.wrap(self.bubble, width=26)[:4]
 
