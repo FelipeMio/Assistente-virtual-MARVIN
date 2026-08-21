@@ -1,4 +1,4 @@
-﻿import json
+import json
 from pathlib import Path
 
 
@@ -16,6 +16,10 @@ CFG_DEFAULTS = {
     "opacidade": 1.0,
     "tamanho_normal": 90,
     "tamanho_compacto": 85,
+    "frases_idle": [
+        "Clique com botao esquerdo para o menu.",
+        "Clique com botao direito para o menu.",
+    ],
 }
 
 

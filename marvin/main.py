@@ -62,128 +62,137 @@ C = dict(
     bub_bd  = "#58a6ff",
 )
 
-#  PIXEL ART DO MARVIN
-
-_PAL = {
-    " ": None,
-    "#": "#000000",
-    "D": "#2e2f34",
-    "B": "#2c334d",
-    "W": "#f9f6e9",
-    "R": "#9f2929",
-    "P": "#d77c78",
-    "G": "#a0aab1",
-}
-
-GATO = [
-    "     ##           ##    ",
-    "    #DD#         #DDD   ",
-    "    #PDD#       #DPPD   ",
-    "    #PPDD#######DPPPD   ",
-    "    #PPPDDDDDDDDPPPPD   ",
-    "    #PPDDDDDDDDDDPPPD   ",
-    "    #PDDDDDDDDDDDDDPD   ",
-    "    #DDDDDDWGDDDDDDD#   ",
-    "    #DDDDD#WGDDDDDDDD   ",
-    "   #DDD#DDWWWD#DDDDDDG  ",
-    "WWWBGDDG#DWWWDG#DDDGGGWW",
-    "WWW#DDDDDWWWWBDDDDDDDBWW",
-    "   #GDDDWWGPWWWDDDDGGB  ",
-    " GGGDDDWWWGWWWWWWDDDGGG ",
-    "    #WWWWWG##WWWWWW #   ",
-    "     #WWWWWWWWWWWWW#    ",
-    "      #WWWWWWWWWW##     ",
-    "      ###########B##    ",
-    "     #BB#WRRG #BBBBB#   ",
-    "    #BBBBBGRG #BBBBB#   ",
-    "    #BBBBBGRGBBBBBBBB#  ",
-    "   #BBBBBBGRGBBBBBBBB#  ",
-    "   #B#BBBDRRRBBBBB#BBB# ",
-    "  #BB#BBBBDRRBBBBB#BBB# ",
-    "  #BB#BBBBDDBBBBBB#BBB# ",
-    "  #BB#BBBBBBBBBBBB#BBB# ",
-    "  #BB#BBBBBBBBBBBB#BBB# ",
-    "  ####BBBBBBBBBBBB##### ",
-    "  #WW#BBBBBBBBBBBB#GWW# ",
-    "  W###BBBBBBBBBBBBB###W ",
-    "     ###############    ",
-    "      #BBBBBBBBBBBB#    ",
-    "      #BBBBBBBBBBBB#    ",
-    "      #BBBD##DBBBB#     ",
-    "       #BBDW DBBBB#     ",
-    "       #BBDW  #BBB#     ",
-    "       ####W  #####     ",
-    "     G#WWWGGGG#WWWW#G   ",
-    "    GGBBBBBGGGG#BBBBGG  ",
-    "      GGGGGGGGGGGGGG    ",
-]
-
-CAT_COLS = 24
-CAT_ROWS = 40
-PX       = 4
-
-
-def _cor_pixel(ch, row, col, t, state, blink):
-    if blink and 7 <= row <= 10 and ch in ("#", "W"):
-        if (7 <= col <= 8) or (13 <= col <= 14):
-            return _PAL["D"]
-    if ch == "R" and state == "alert":
-        p  = abs(math.sin(t * 6))
-        rv = int(0x9f + p * (0xff - 0x9f))
-        gv = int(0x29 * (1 - p) + 0xaa * p)
-        bv = int(0x29 * (1 - p))
-        return f"#{rv:02x}{gv:02x}{bv:02x}"
-    return _PAL.get(ch)
-
-
-def draw_cat(cv, t, state, W, H):
-    cv.delete("all")
-    bob     = math.sin(t * 1.4) * 3
-    total_w = CAT_COLS * PX
-    total_h = CAT_ROWS * PX
-    ox      = (W - total_w) // 2
-    oy      = int(H - total_h - 8 + bob)
-
-    
-    # Halo alert
-    if state == "alert":
-        p    = abs(math.sin(t * 4))
-        rv   = int(160 + p * 80)
-        gv   = int(60  + p * 60)
-        hcol = f"#{rv:02x}{gv:02x}00"
-        for dr in (3, 7, 12):
-            cv.create_rectangle(ox - dr, oy - dr,
-                                 ox + total_w + dr, oy + total_h + dr,
-                                 fill="", outline=hcol, width=1)
-
-    # Halo thinking
-    if state == "thinking":
-        p    = abs(math.sin(t * 2))
-        bv   = int(80 + p * 80)
-        hcol = f"#00{bv:02x}ff"
-        for dr in (3, 7):
-            cv.create_rectangle(ox - dr, oy - dr,
-                                 ox + total_w + dr, oy + total_h + dr,
-                                 fill="", outline=hcol, width=1)
-
-    arm_shift = int(math.sin(t * 7) * 9) if state == "alert" else 0
-    blink     = (int(t * 2.0) % 100 < 4)
-
-    for row_i, linha in enumerate(GATO):
-        for col_i, ch in enumerate(linha):
-            if ch == " ":
-                continue
-            cor = _cor_pixel(ch, row_i, col_i, t, state, blink)
-            if cor is None:
-                continue
-            dy = arm_shift if (state == "alert"
-                               and 20 <= row_i <= 28
-                               and 20 <= col_i <= 23) else 0
-            x0 = ox + col_i * PX
-            y0 = oy + row_i * PX + dy
-            cv.create_rectangle(x0, y0, x0 + PX, y0 + PX,
-                                 fill=cor, outline="")
-
+# ============================================================
+# [LEGADO] PIXEL ART ANTIGA DO MARVIN
+#
+# Este sistema nao e mais utilizado.
+# O MARVIN atual usa sprites PNG em assets/marvin/.
+# Mantido apenas como referencia.
+# ============================================================
+#
+# #  PIXEL ART DO MARVIN
+#
+# _PAL = {
+#     " ": None,
+#     "#": "#000000",
+#     "D": "#2e2f34",
+#     "B": "#2c334d",
+#     "W": "#f9f6e9",
+#     "R": "#9f2929",
+#     "P": "#d77c78",
+#     "G": "#a0aab1",
+# }
+#
+# GATO = [
+#     "     ##           ##    ",
+#     "    #DD#         #DDD   ",
+#     "    #PDD#       #DPPD   ",
+#     "    #PPDD#######DPPPD   ",
+#     "    #PPPDDDDDDDDPPPPD   ",
+#     "    #PPDDDDDDDDDDPPPD   ",
+#     "    #PDDDDDDDDDDDDDPD   ",
+#     "    #DDDDDDWGDDDDDDD#   ",
+#     "    #DDDDD#WGDDDDDDDD   ",
+#     "   #DDD#DDWWWD#DDDDDDG  ",
+#     "WWWBGDDG#DWWWDG#DDDGGGWW",
+#     "WWW#DDDDDWWWWBDDDDDDDBWW",
+#     "   #GDDDWWGPWWWDDDDGGB  ",
+#     " GGGDDDWWWGWWWWWWDDDGGG ",
+#     "    #WWWWWG##WWWWWW #   ",
+#     "     #WWWWWWWWWWWWW#    ",
+#     "      #WWWWWWWWWW##     ",
+#     "      ###########B##    ",
+#     "     #BB#WRRG #BBBBB#   ",
+#     "    #BBBBBGRG #BBBBB#   ",
+#     "    #BBBBBGRGBBBBBBBB#  ",
+#     "   #BBBBBBGRGBBBBBBBB#  ",
+#     "   #B#BBBDRRRBBBBB#BBB# ",
+#     "  #BB#BBBBDRRBBBBB#BBB# ",
+#     "  #BB#BBBBDDBBBBBB#BBB# ",
+#     "  #BB#BBBBBBBBBBBB#BBB# ",
+#     "  #BB#BBBBBBBBBBBB#BBB# ",
+#     "  ####BBBBBBBBBBBB##### ",
+#     "  #WW#BBBBBBBBBBBB#GWW# ",
+#     "  W###BBBBBBBBBBBBB###W ",
+#     "     ###############    ",
+#     "      #BBBBBBBBBBBB#    ",
+#     "      #BBBBBBBBBBBB#    ",
+#     "      #BBBD##DBBBB#     ",
+#     "       #BBDW DBBBB#     ",
+#     "       #BBDW  #BBB#     ",
+#     "       ####W  #####     ",
+#     "     G#WWWGGGG#WWWW#G   ",
+#     "    GGBBBBBGGGG#BBBBGG  ",
+#     "      GGGGGGGGGGGGGG    ",
+# ]
+#
+# CAT_COLS = 24
+# CAT_ROWS = 40
+# PX       = 4
+#
+#
+# def _cor_pixel(ch, row, col, t, state, blink):
+#     if blink and 7 <= row <= 10 and ch in ("#", "W"):
+#         if (7 <= col <= 8) or (13 <= col <= 14):
+#             return _PAL["D"]
+#     if ch == "R" and state == "alert":
+#         p  = abs(math.sin(t * 6))
+#         rv = int(0x9f + p * (0xff - 0x9f))
+#         gv = int(0x29 * (1 - p) + 0xaa * p)
+#         bv = int(0x29 * (1 - p))
+#         return f"#{rv:02x}{gv:02x}{bv:02x}"
+#     return _PAL.get(ch)
+#
+#
+# def draw_cat(cv, t, state, W, H):
+#     cv.delete("all")
+#     bob     = math.sin(t * 1.4) * 3
+#     total_w = CAT_COLS * PX
+#     total_h = CAT_ROWS * PX
+#     ox      = (W - total_w) // 2
+#     oy      = int(H - total_h - 8 + bob)
+#
+#
+#     # Halo alert
+#     if state == "alert":
+#         p    = abs(math.sin(t * 4))
+#         rv   = int(160 + p * 80)
+#         gv   = int(60  + p * 60)
+#         hcol = f"#{rv:02x}{gv:02x}00"
+#         for dr in (3, 7, 12):
+#             cv.create_rectangle(ox - dr, oy - dr,
+#                                  ox + total_w + dr, oy + total_h + dr,
+#                                  fill="", outline=hcol, width=1)
+#
+#     # Halo thinking
+#     if state == "thinking":
+#         p    = abs(math.sin(t * 2))
+#         bv   = int(80 + p * 80)
+#         hcol = f"#00{bv:02x}ff"
+#         for dr in (3, 7):
+#             cv.create_rectangle(ox - dr, oy - dr,
+#                                  ox + total_w + dr, oy + total_h + dr,
+#                                  fill="", outline=hcol, width=1)
+#
+#     arm_shift = int(math.sin(t * 7) * 9) if state == "alert" else 0
+#     blink     = (int(t * 2.0) % 100 < 4)
+#
+#     for row_i, linha in enumerate(GATO):
+#         for col_i, ch in enumerate(linha):
+#             if ch == " ":
+#                 continue
+#             cor = _cor_pixel(ch, row_i, col_i, t, state, blink)
+#             if cor is None:
+#                 continue
+#             dy = arm_shift if (state == "alert"
+#                                and 20 <= row_i <= 28
+#                                and 20 <= col_i <= 23) else 0
+#             x0 = ox + col_i * PX
+#             y0 = oy + row_i * PX + dy
+#             cv.create_rectangle(x0, y0, x0 + PX, y0 + PX,
+#                                  fill=cor, outline="")
+#
+#
 
 def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
 
@@ -425,6 +434,26 @@ _IDLE_MSGS = [
   
     
 ]
+
+def _frases_idle_ativas():
+    """
+    Retorna as frases personalizadas do MARVIN.
+    Se nao houver nenhuma valida, usa as frases padrao.
+    """
+    frases = cfg.get("frases_idle", [])
+
+    if isinstance(frases, list):
+        frases = [
+            str(frase).strip()
+            for frase in frases
+            if str(frase).strip()
+        ]
+
+    if frases:
+        return frases
+
+    return _IDLE_MSGS
+
 
 def _frase_saudacao(n):
     hora = datetime.datetime.now().hour
@@ -1149,7 +1178,7 @@ class EditTaskWindow:
 class SettingsWindow:
     def __init__(self, parent, companion):
         self.comp = companion
-        self.win  = _make_win(parent, "Configuracoes", 400, 440)
+        self.win  = _make_win(parent, "Configuracoes", 400, 650)
         self.win.grab_set()
         self._build()
         _position_near_marvin(self.win, self.comp)
@@ -1159,18 +1188,6 @@ class SettingsWindow:
         _header(w, "Configuracoes")
         body = tk.Frame(w, bg=C["win_bg"])
         body.pack(fill="both", expand=True, padx=20, pady=14)
-
-        # Nao Perturbe
-        self.v_np = tk.BooleanVar(value=cfg.get("nao_perturbe", False))
-        r1 = tk.Frame(body, bg=C["win_bg"])
-        r1.pack(fill="x", pady=4)
-        tk.Checkbutton(r1, variable=self.v_np,
-                        bg=C["win_bg"], selectcolor=C["panel"],
-                        activebackground=C["win_bg"],
-                        cursor="hand2").pack(side="left")
-        tk.Label(r1, text="Modo Nao Perturbe (MARVIN fica compacto)",
-                  bg=C["win_bg"], fg=C["text"],
-                  font=("Consolas", 9)).pack(side="left")
 
         # Som
         self.v_som = tk.BooleanVar(value=cfg.get("som", True))
@@ -1265,6 +1282,61 @@ class SettingsWindow:
                   command=self._preview_opacity
                   ).pack(fill="x", pady=4)
 
+        # Frases personalizadas
+        tk.Frame(
+            body,
+            bg=C["border"],
+            height=1
+        ).pack(fill="x", pady=8)
+
+        tk.Label(
+            body,
+            text="Frases do MARVIN",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8, "bold")
+        ).pack(anchor="w")
+
+        tk.Label(
+            body,
+            text="Uma frase por linha. O MARVIN escolhe uma aleatoriamente.",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 7)
+        ).pack(anchor="w", pady=(2, 5))
+
+        self.txt_frases = tk.Text(
+            body,
+            height=4,
+            bg=C["panel"],
+            fg=C["text"],
+            insertbackground=C["text"],
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=6,
+            font=("Consolas", 8),
+            wrap="word"
+        )
+
+        self.txt_frases.pack(
+            fill="x",
+            pady=(0, 4)
+        )
+
+        frases_atuais = cfg.get(
+            "frases_idle",
+            _IDLE_MSGS
+        )
+
+        if not isinstance(frases_atuais, list):
+            frases_atuais = _IDLE_MSGS
+
+        self.txt_frases.insert(
+            "1.0",
+            "\n".join(frases_atuais)
+        )
+
         # Limpeza
         tk.Frame(body, bg=C["border"], height=1).pack(fill="x", pady=8)
         tk.Button(body,
@@ -1280,13 +1352,20 @@ class SettingsWindow:
                   font=("Consolas", 7),
                   wraplength=360).pack(anchor="w", pady=(8, 0))
 
-        tk.Button(body, text="  Salvar e Fechar  ",
-                   bg=C["green"], fg=C["win_bg"], bd=0,
-                   padx=14, pady=7,
-                   font=("Consolas", 9, "bold"), cursor="hand2",
-                   activebackground=C["accent"],
-                   activeforeground=C["win_bg"],
-                   command=self._salvar).pack(anchor="w", pady=10)
+        tk.Button(
+            body,
+            text="Salvar e Fechar",
+            bg=C["green"],
+            fg=C["win_bg"],
+            bd=0,
+            padx=10,
+            pady=9,
+            font=("Consolas", 9, "bold"),
+            cursor="hand2",
+            activebackground=C["accent"],
+            activeforeground=C["win_bg"],
+            command=self._salvar
+        ).pack(anchor="w", pady=10)
 
     def _preview_size(self, chave, valor):
         try:
@@ -1331,7 +1410,6 @@ class SettingsWindow:
 
 
     def _salvar(self):
-        cfg["nao_perturbe"] = self.v_np.get()
         cfg["som"]          = self.v_som.get()
         cfg["opacidade"]    = round(self.v_op.get(), 2)
 
@@ -1341,6 +1419,22 @@ class SettingsWindow:
 
         cfg["tamanho_compacto"] = int(
             self.v_size_compact.get()
+        )
+
+        frases = [
+            linha.strip()
+            for linha in self.txt_frases.get(
+                "1.0",
+                "end"
+            ).splitlines()
+            if linha.strip()
+        ]
+
+        # Se apagar tudo, volta para as frases padrao.
+        cfg["frases_idle"] = (
+            frases
+            if frases
+            else list(_IDLE_MSGS)
         )
 
         save_cfg(cfg)
@@ -1788,6 +1882,12 @@ class MarvinCompanion:
     COMPACT_W = 100
     COMPACT_H = 72
 
+    # Tempo total desde que o lembrete apareceu.
+    # 1min -> imagem 01
+    # 1min30 -> imagem 02
+    # 2min -> imagem 03
+    WAITING_TIMES = (30.0, 32.0, 60.0)
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Marvin")
@@ -1831,6 +1931,7 @@ class MarvinCompanion:
         # Sprites do MARVIN
         self._idle_frames = self._load_idle_frames()
         self._alert_frames = self._load_alert_frames()
+        self._waiting_frames = self._load_waiting_frames()
         self._happy_frame = self._load_happy_frame()
         self._compact_frames = self._load_compact_frames()
         self._yawn_frames = self._load_yawn_frames()
@@ -1849,12 +1950,15 @@ class MarvinCompanion:
         self._alert_frame_index = 0
         self._alert_last_frame = time.monotonic()
 
+        # Momento em que o lembrete atual apareceu.
+        self._reminder_started_at = None
+
         # Controle do modo compacto / Nao Perturbe
         self._compact_mode = False
         self._compact_enabled = False
         self._compact_frame_index = 0
         self._compact_last_frame = time.monotonic()
-        self._compact_sequence = [0, 0, 0, 0, 1, 1, 1, 1, 2, 0]
+        self._compact_sequence = [0, 0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 2, 0]
         self._normal_pos = None
 
         # Estado
@@ -1954,6 +2058,7 @@ class MarvinCompanion:
     def _reload_sprites(self):
         self._idle_frames = self._load_idle_frames()
         self._alert_frames = self._load_alert_frames()
+        self._waiting_frames = self._load_waiting_frames()
         self._happy_frame = self._load_happy_frame()
         self._compact_frames = self._load_compact_frames()
         self._yawn_frames = self._load_yawn_frames()
@@ -2034,6 +2139,51 @@ class MarvinCompanion:
 
         print(
             f"[MARVIN] {len(frames)} frame(s) alert carregado(s)."
+        )
+
+        return frames
+
+
+    def _load_waiting_frames(self):
+        pasta = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "marvin"
+            / "waiting"
+        )
+
+        arquivos = [
+            pasta / "01.png",
+            pasta / "02.png",
+            pasta / "03.png",
+        ]
+
+        frames = []
+
+        for arquivo in arquivos:
+            if not arquivo.exists():
+                print(
+                    f"[MARVIN] Sprite waiting nao encontrado: {arquivo}"
+                )
+                continue
+
+            imagem = Image.open(
+                arquivo
+            ).convert("RGBA")
+
+            tamanho = self._normal_sprite_size()
+
+            imagem = imagem.resize(
+                (tamanho, tamanho),
+                Image.Resampling.NEAREST
+            )
+
+            frames.append(
+                ImageTk.PhotoImage(imagem)
+            )
+
+        print(
+            f"[MARVIN] {len(frames)} frame(s) waiting carregado(s)."
         )
 
         return frames
@@ -2356,6 +2506,81 @@ class MarvinCompanion:
         return top_y
 
 
+    def _draw_waiting_sprite(self, indice):
+        if not self._waiting_frames:
+            return self._draw_alert_sprite()
+
+        indice = max(
+            0,
+            min(
+                indice,
+                len(self._waiting_frames) - 1
+            )
+        )
+
+        frame = self._waiting_frames[indice]
+
+        self.cv.delete("all")
+
+        bob = int(
+            math.sin(self.t * 1.4) * 3
+        )
+
+        x = self.W // 2
+        bottom_y = self.H - 8 + bob
+        top_y = bottom_y - frame.height()
+
+        self.cv.create_image(
+            x,
+            bottom_y,
+            image=frame,
+            anchor="s"
+        )
+
+        return top_y
+
+
+    def _draw_reminder_sprite(self):
+        """
+        Escolhe o sprite do lembrete conforme
+        o tempo que o usuario esta sem responder.
+        """
+
+        # Se o usuario ja abriu o menu de adiar,
+        # ele ja respondeu ao alerta.
+        if self._bubble_mode != "alert":
+            return self._draw_alert_sprite()
+
+        if self._reminder_started_at is None:
+            return self._draw_alert_sprite()
+
+        if not self._waiting_frames:
+            return self._draw_alert_sprite()
+
+        tempo = (
+            time.monotonic()
+            - self._reminder_started_at
+        )
+
+        t1, t2, t3 = self.WAITING_TIMES
+
+        # 2 minutos ou mais
+        if tempo >= t3:
+            return self._draw_waiting_sprite(2)
+
+        # 1 minuto e 30 segundos
+        if tempo >= t2:
+            return self._draw_waiting_sprite(1)
+
+        # 1 minuto
+        if tempo >= t1:
+            return self._draw_waiting_sprite(0)
+
+        # Antes de 1 minuto continua usando
+        # a animacao normal de alerta.
+        return self._draw_alert_sprite()
+
+
     def _draw_compact_sprite(self):
         if not self._compact_frames:
             return None
@@ -2447,7 +2672,11 @@ class MarvinCompanion:
         if self.state == "idle" and not self.bubble:
             self._bubble_mode = "normal"
             self._bubble_hover = None
-            self.say(random.choice(_IDLE_MSGS), "talking", 10000)
+            self.say(
+                random.choice(_frases_idle_ativas()),
+                "talking",
+                10000
+            )
         self._schedule_idle()
 
     # ── Fala ──────────────────────────────────────────────────────────────────
@@ -2490,6 +2719,13 @@ class MarvinCompanion:
         if self._reminder_queue:
             nxt = self._reminder_queue[0]
 
+            # A proxima tarefa acabou de virar o alerta ativo.
+            if cfg.get("som", True):
+                _beep()
+
+            # Nova tarefa = novo contador de espera.
+            self._reminder_started_at = time.monotonic()
+
             self.state = "alert"
             self.b_timer = 0
             self.bubble = f"Hora de: {nxt[1]}"
@@ -2498,6 +2734,7 @@ class MarvinCompanion:
             self._bubble_hover = None
 
         else:
+            self._reminder_started_at = None
             self.state = "idle"
             self.bubble = ""
             self.b_timer = 0
@@ -2556,12 +2793,17 @@ class MarvinCompanion:
                     self.bubble = ""
                     self.state = "idle"
 
-        # Sprite de lembrete
+        # Sprite de lembrete.
+        # Depois de algum tempo sem resposta,
+        # troca progressivamente para os sprites waiting.
         if (
             self.state == "alert"
-            and self._alert_frames
+            and (
+                self._alert_frames
+                or self._waiting_frames
+            )
         ):
-            top_y = self._draw_alert_sprite()
+            top_y = self._draw_reminder_sprite()
 
         # Sprite feliz
         elif (
@@ -2584,23 +2826,10 @@ class MarvinCompanion:
         ):
             top_y = self._draw_idle_sprite()
 
-        # Fallback para a pixel art antiga
+        # Fallback caso nenhum sprite PNG esteja disponivel.
         else:
-            draw_cat(
-                self.cv,
-                self.t,
-                self.state,
-                self.W,
-                self.H
-            )
-
-            bob = math.sin(self.t * 1.4) * 3
-            top_y = int(
-                self.H
-                - CAT_ROWS * PX
-                - 8
-                + bob
-            )
+            self.cv.delete("all")
+            top_y = self.H - 8
 
         if self.bubble:
             draw_bubble(
@@ -2658,14 +2887,19 @@ class MarvinCompanion:
                 + bob
                 - sprite_h
             )
-        else:
-            # Fallback para a pixel art antiga.
-            top_y = int(
+        elif self._waiting_frames:
+            sprite_h = self._waiting_frames[0].height()
+
+            top_y = (
                 self.H
-                - CAT_ROWS * PX
                 - 8
                 + bob
+                - sprite_h
             )
+
+        else:
+            # Nenhum sprite disponivel.
+            top_y = self.H - 8 + bob
 
         wrapped = textwrap.wrap(self.bubble, width=26)[:4]
 
@@ -2763,6 +2997,10 @@ class MarvinCompanion:
                 self.complete_task()
 
             elif button == "snooze":
+                # O usuario respondeu ao alerta,
+                # portanto nao continua ficando impaciente.
+                self._reminder_started_at = None
+
                 self._bubble_mode = "snooze"
                 self._bubble_hover = None
 
@@ -2789,6 +3027,10 @@ class MarvinCompanion:
                     self._next_reminder()
 
             elif button == "back":
+                # Voltou sem escolher adiamento:
+                # comeca novamente a contar a espera.
+                self._reminder_started_at = time.monotonic()
+
                 self._bubble_mode = "alert"
                 self._bubble_hover = None
 
@@ -2906,7 +3148,22 @@ class MarvinCompanion:
         if self._compact_enabled:
             self._compact_mode = False
 
+        # Se ja existe um alerta na tela,
+        # apenas adiciona esta tarefa na fila.
+        was_empty = not self._reminder_queue
+
         self._reminder_queue.append(row)
+
+        if not was_empty:
+            return
+
+        # Som do lembrete.
+        if cfg.get("som", True):
+            _beep()
+
+        # Comeca agora a contar quanto tempo
+        # o usuario demora para responder.
+        self._reminder_started_at = time.monotonic()
         
         self._bubble_mode = "alert"
         self._bubble_hover = None
