@@ -1277,12 +1277,217 @@ class EditTaskWindow:
         self.comp.say("Tarefa editada!", "talking", 2000)
         self.win.destroy()
 
+#  JANELA: FRASES DE ESPERA
+
+class WaitingPhrasesWindow:
+    DEFAULTS = [
+        "Ei... {tarefa}",
+        "Vai fazer ou adiar? {tarefa}",
+        "Ainda estou esperando: {tarefa}",
+    ]
+
+    def __init__(self, parent, companion):
+        self.comp = companion
+
+        self.win = _make_win(
+            parent,
+            "Frases de espera",
+            430,
+            310
+        )
+
+        self._build()
+
+        _position_near_marvin(
+            self.win,
+            self.comp
+        )
+
+
+    def _build(self):
+        w = self.win
+
+        _header(
+            w,
+            "Frases de espera"
+        )
+
+        body = tk.Frame(
+            w,
+            bg=C["win_bg"]
+        )
+
+        body.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=12
+        )
+
+        tk.Label(
+            body,
+            text=(
+                "Use {tarefa} onde quiser que "
+                "apareca o nome da tarefa."
+            ),
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8),
+            wraplength=380,
+            justify="left"
+        ).pack(
+            anchor="w",
+            pady=(0, 10)
+        )
+
+        frases = cfg.get(
+            "frases_waiting",
+            self.DEFAULTS
+        )
+
+        if (
+            not isinstance(frases, list)
+            or len(frases) < 3
+        ):
+            frases = list(
+                self.DEFAULTS
+            )
+
+        self.vars = []
+
+        labels = [
+            "Primeira reacao",
+            "Segunda reacao",
+            "Terceira reacao",
+        ]
+
+        for i, label in enumerate(labels):
+
+            tk.Label(
+                body,
+                text=label,
+                bg=C["win_bg"],
+                fg=C["dim"],
+                font=(
+                    "Consolas",
+                    8,
+                    "bold"
+                )
+            ).pack(
+                anchor="w",
+                pady=(5, 2)
+            )
+
+            var = tk.StringVar(
+                value=str(frases[i])
+            )
+
+            self.vars.append(var)
+
+            entry = tk.Entry(
+                body,
+                textvariable=var,
+                bg=C["panel"],
+                fg=C["text"],
+                insertbackground=C["text"],
+                relief="flat",
+                bd=0,
+                font=("Consolas", 8)
+            )
+
+            entry.pack(
+                fill="x",
+                ipady=6
+            )
+
+        botoes = tk.Frame(
+            body,
+            bg=C["win_bg"]
+        )
+
+        botoes.pack(
+            anchor="w",
+            pady=(14, 0)
+        )
+
+        tk.Button(
+            botoes,
+            text="Salvar",
+            bg=C["green"],
+            fg=C["win_bg"],
+            bd=0,
+            padx=14,
+            pady=7,
+            font=(
+                "Consolas",
+                9,
+                "bold"
+            ),
+            cursor="hand2",
+            activebackground=C["accent"],
+            command=self._salvar
+        ).pack(
+            side="left"
+        )
+
+        tk.Button(
+            botoes,
+            text="Restaurar padrao",
+            bg=C["panel"],
+            fg=C["dim"],
+            bd=0,
+            padx=10,
+            pady=7,
+            font=("Consolas", 8),
+            cursor="hand2",
+            activebackground=C["border"],
+            command=self._restaurar
+        ).pack(
+            side="left",
+            padx=8
+        )
+
+
+    def _restaurar(self):
+        for var, texto in zip(
+            self.vars,
+            self.DEFAULTS
+        ):
+            var.set(texto)
+
+
+    def _salvar(self):
+        frases = []
+
+        for i, var in enumerate(
+            self.vars
+        ):
+            texto = var.get().strip()
+
+            if not texto:
+                texto = self.DEFAULTS[i]
+
+            frases.append(texto)
+
+        cfg["frases_waiting"] = frases
+
+        save_cfg(cfg)
+
+        self.comp.say(
+            "Frases salvas!",
+            "talking",
+            2000
+        )
+
+        self.win.destroy()
+
+
 #  JANELA: CONFIGURACOES
 
 class SettingsWindow:
     def __init__(self, parent, companion):
         self.comp = companion
-        self.win  = _make_win(parent, "Configuracoes", 400, 690)
+        self.win  = _make_win(parent, "Configuracoes", 400, 730)
         self.win.grab_set()
         self._build()
         _position_near_marvin(self.win, self.comp)
@@ -1471,6 +1676,27 @@ class SettingsWindow:
         self.txt_frases.insert(
             "1.0",
             "\n".join(frases_atuais)
+        )
+
+        tk.Button(
+            body,
+            text="Personalizar frases de espera",
+            bg=C["panel"],
+            fg=C["accent"],
+            bd=0,
+            padx=10,
+            pady=6,
+            font=("Consolas", 8),
+            cursor="hand2",
+            activebackground=C["border"],
+            activeforeground=C["text"],
+            command=lambda: WaitingPhrasesWindow(
+                self.win,
+                self.comp
+            )
+        ).pack(
+            anchor="w",
+            pady=(4, 0)
         )
 
         # Limpeza
@@ -3504,32 +3730,68 @@ class MarvinCompanion:
 
         if tempo >= t3:
             stage = 3
+
         elif tempo >= t2:
             stage = 2
+
         elif tempo >= t1:
             stage = 1
+
         else:
             stage = 0
 
-        if stage == self._waiting_reaction_stage:
+        if (
+            stage
+            == self._waiting_reaction_stage
+        ):
             return
 
         self._waiting_reaction_stage = stage
 
-        tarefa = self._reminder_queue[0][1]
+        if stage == 0:
+            return
 
-        if stage == 1:
-            self.bubble = f"Ei... {tarefa}"
+        tarefa = (
+            self._reminder_queue[0][1]
+        )
 
-        elif stage == 2:
-            self.bubble = (
-                f"Vai fazer ou adiar? {tarefa}"
-            )
+        defaults = [
+            "Ei... {tarefa}",
+            "Vai fazer ou adiar? {tarefa}",
+            "Ainda estou esperando: {tarefa}",
+        ]
 
-        elif stage == 3:
-            self.bubble = (
-                f"Ainda estou esperando: {tarefa}"
-            )
+        frases = cfg.get(
+            "frases_waiting",
+            defaults
+        )
+
+        if (
+            not isinstance(frases, list)
+            or len(frases) < 3
+        ):
+            frases = defaults
+
+        try:
+            frase = str(
+                frases[stage - 1]
+            ).strip()
+        except Exception:
+            frase = defaults[
+                stage - 1
+            ]
+
+        if not frase:
+            frase = defaults[
+                stage - 1
+            ]
+
+        # Substitui apenas nosso marcador.
+        # Outros caracteres { } permanecem intactos.
+        self.bubble = frase.replace(
+            "{tarefa}",
+            tarefa
+        )
 
 
     def _draw_reminder_sprite(self):

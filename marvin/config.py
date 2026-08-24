@@ -22,6 +22,11 @@ CFG_DEFAULTS = {
         "Clique com botao esquerdo para o menu.",
         "Clique com botao direito para o menu.",
     ],
+    "frases_waiting": [
+        "Ei... {tarefa}",
+        "Vai fazer ou adiar? {tarefa}",
+        "Ainda estou esperando: {tarefa}",
+    ],
 }
 
 
