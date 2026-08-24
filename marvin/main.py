@@ -11,12 +11,7 @@ except ImportError:
 
 from .config import load_cfg, save_cfg
 
-# Extensoes exclusivas desta maquina.
-# O arquivo local_extensions.py nao faz parte do GitHub.
-try:
-    from .local_extensions import iniciar_extensoes_locais
-except ImportError:
-    iniciar_extensoes_locais = None
+from .extension_loader import carregar_extensoes
 
 from marvin.database import (
     DB_F,
@@ -2836,21 +2831,8 @@ class MarvinCompanion:
         self._animate()
         self._start_reminders()
 
-        # Recursos exclusivos desta maquina podem ser
-        # carregados por marvin/local_extensions.py.
-        self._local_extensions = []
-
-        if iniciar_extensoes_locais is not None:
-            try:
-                extensoes = iniciar_extensoes_locais(self)
-
-                if extensoes:
-                    self._local_extensions = list(extensoes)
-
-            except Exception as exc:
-                print(
-                    f"[MARVIN] Erro ao carregar extensoes locais: {exc}"
-                )
+        # Carrega extensoes opcionais instaladas.
+        self._extensions = carregar_extensoes(self)
 
         threading.Thread(target=db_limpar_antigas, daemon=True).start()
         self.root.after(900, self._inicio_do_dia)

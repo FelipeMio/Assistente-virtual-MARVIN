@@ -1,0 +1,7 @@
+﻿{
+    "enabled": false,
+    "csv_path": "C:\\CAMINHO\\PARA\\MARVIN_GOE_MONITOR.csv",
+    "notify_stopped": true,
+    "notify_ok": true,
+    "sound": true
+}

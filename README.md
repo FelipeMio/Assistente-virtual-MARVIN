@@ -53,3 +53,30 @@ e utilizar inteligência artificial.
 
 ```bash
 git clone https://github.com/FelipeMio/Assistente-virtual-MARVIN.git
+
+## 🧩 Extensões
+
+O MARVIN possui suporte a extensões opcionais.
+
+As extensões adicionam funcionalidades extras sem alterar o funcionamento
+principal do assistente. Quem não precisa delas pode utilizar o MARVIN
+normalmente.
+
+### 📊 Monitor GOE
+
+O Monitor GOE é uma extensão opcional criada para acompanhar
+automaticamente um monitoramento baseado em dados exportados para CSV.
+
+Ele pode:
+
+- avisar quando o monitoramento retorna `0`;
+- manter o alerta aberto até o usuário confirmar;
+- avisar quando o monitoramento volta ao normal;
+- informar a cada hora que o monitoramento continua funcionando.
+
+O MARVIN principal **não depende do GOE**.
+
+Quem deseja utilizar apenas tarefas, lembretes e as funções normais do
+MARVIN não precisa configurar nada.
+
+➡️ [Documentação completa do Monitor GOE](extensions/goe/README.md)
