@@ -134,16 +134,114 @@ def db_prioridade(tid):
         return prioridade
 
 
+def _proxima_data_recorrente(data_atual, recorrencia):
+    """
+    Calcula a proxima ocorrencia de uma tarefa recorrente.
+
+    A data salva na tarefa representa sempre a proxima
+    ocorrencia que ainda precisa ser feita.
+    """
+    hoje = datetime.date.today()
+
+    try:
+        original = datetime.date.fromisoformat(data_atual)
+    except (TypeError, ValueError):
+        original = hoje
+
+    # Se a tarefa estiver atrasada, partimos de hoje.
+    base = max(original, hoje)
+
+    if recorrencia == "Todo dia":
+        return base + datetime.timedelta(days=1)
+
+    if recorrencia == "Toda semana":
+        # Mantem o mesmo dia da semana da data original.
+        alvo = original.weekday()
+
+        candidato = base + datetime.timedelta(days=1)
+
+        while candidato.weekday() != alvo:
+            candidato += datetime.timedelta(days=1)
+
+        return candidato
+
+    if recorrencia == "Seg/Qua/Sex":
+        permitidos = {0, 2, 4}
+
+    elif recorrencia == "Seg a Sex":
+        permitidos = {0, 1, 2, 3, 4}
+
+    elif recorrencia == "Fins de semana":
+        permitidos = {5, 6}
+
+    else:
+        return None
+
+    candidato = base + datetime.timedelta(days=1)
+
+    while candidato.weekday() not in permitidos:
+        candidato += datetime.timedelta(days=1)
+
+    return candidato
+
+
 def db_concluir(tid):
     agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     with _db_lock:
         cursor.execute(
-            "UPDATE tarefas "
-            "SET concluida=1, lembrado=1, concluido_em=? "
-            "WHERE id=?",
-            (agora, tid),
+            "SELECT data, recorrencia "
+            "FROM tarefas WHERE id=?",
+            (tid,),
         )
+
+        row = cursor.fetchone()
+
+        if not row:
+            return
+
+        data_atual, recorrencia = row
+
+        # Tarefa comum: comportamento antigo.
+        if recorrencia == "Nunca":
+            cursor.execute(
+                "UPDATE tarefas "
+                "SET concluida=1, lembrado=1, concluido_em=? "
+                "WHERE id=?",
+                (agora, tid),
+            )
+
+        else:
+            proxima = _proxima_data_recorrente(
+                data_atual,
+                recorrencia,
+            )
+
+            if proxima is None:
+                # Protecao caso exista uma recorrencia desconhecida.
+                cursor.execute(
+                    "UPDATE tarefas "
+                    "SET concluida=1, lembrado=1, concluido_em=? "
+                    "WHERE id=?",
+                    (agora, tid),
+                )
+
+            else:
+                # A tarefa recorrente continua ativa.
+                # Apenas avancamos para a proxima ocorrencia.
+                cursor.execute(
+                    "UPDATE tarefas "
+                    "SET data=?, "
+                    "concluida=0, "
+                    "lembrado=0, "
+                    "concluido_em=? "
+                    "WHERE id=?",
+                    (
+                        proxima.isoformat(),
+                        agora,
+                        tid,
+                    ),
+                )
 
         con.commit()
 
@@ -216,7 +314,8 @@ def db_streak_hoje():
     with _db_lock:
         cursor.execute(
             "SELECT COUNT(*) FROM tarefas "
-            "WHERE ativo=1 AND concluida=1 "
+            "WHERE ativo=1 "
+            "AND concluido_em IS NOT NULL "
             "AND substr(concluido_em,1,10)=?",
             (hoje,),
         )
