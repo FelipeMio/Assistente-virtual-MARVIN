@@ -2408,20 +2408,28 @@ class MarvinCompanion:
         self.ctx.add_command(
             label=self._np_label(),
             command=self._toggle_np)                                 # indice 3
+
         self.ctx.add_separator()                                     # indice 4
+
+        self.ctx.add_command(
+            label="Resumo do dia",
+            command=self._resumo_do_dia)                             # indice 5
+
         self.ctx.add_command(
             label="Configuracoes",
-            command=lambda: SettingsWindow(self.root, self))         # indice 5
-        self.ctx.add_separator()                                     # indice 6
+            command=lambda: SettingsWindow(self.root, self))         # indice 6
+
+        self.ctx.add_separator()                                     # indice 7
+
         self.ctx.add_command(
             label="Ocultar MARVIN",
-            command=self._hide_marvin)                               # indice 7
+            command=self._hide_marvin)                               # indice 8
 
-        self.ctx.add_separator()                                     # indice 8
+        self.ctx.add_separator()                                     # indice 9
 
         self.ctx.add_command(
             label="Sair",
-            command=self._on_close)                                  # indice 9
+            command=self._on_close)                                  # indice 10
 
         self._start_tray()
 
@@ -2429,7 +2437,7 @@ class MarvinCompanion:
         self._start_reminders()
 
         threading.Thread(target=db_limpar_antigas, daemon=True).start()
-        self.root.after(900, self._saudacao_inicial)
+        self.root.after(900, self._inicio_do_dia)
 
     # ── Bandeja do Windows ─────────────────────────────────────────────────
 
@@ -2578,6 +2586,14 @@ class MarvinCompanion:
                     )
             ),
 
+            pystray.MenuItem(
+                "Resumo do dia",
+                lambda icon, item:
+                    self._tray_dispatch(
+                        self._tray_summary
+                    )
+            ),
+
             pystray.Menu.SEPARATOR,
 
             pystray.MenuItem(
@@ -2677,6 +2693,11 @@ class MarvinCompanion:
             self.root,
             self
         )
+
+
+    def _tray_summary(self):
+        self._show_marvin()
+        self._resumo_do_dia()
 
 
     def _tray_settings(self):
@@ -3924,6 +3945,238 @@ class MarvinCompanion:
                 self._tray_icon.update_menu()
             except Exception:
                 pass
+
+
+    # ── Resumo do dia ───────────────────────────────────────────────────────
+
+    def _task_due_today(self, row, hoje):
+        """
+        Diz se uma tarefa pendente pertence ao dia atual,
+        considerando a recorrencia.
+        """
+
+        try:
+            (
+                tid,
+                texto,
+                desc,
+                data,
+                hora,
+                rep,
+                concluida,
+                lembrado
+            ) = row
+
+        except Exception:
+            return False
+
+        if concluida:
+            return False
+
+        try:
+            data_base = datetime.date.fromisoformat(
+                data
+            )
+        except Exception:
+            return False
+
+        # A recorrencia ainda nao comecou.
+        if data_base > hoje:
+            return False
+
+        if rep == "Nunca":
+            return data_base == hoje
+
+        if rep == "Todo dia":
+            return True
+
+        if rep == "Toda semana":
+            return (
+                data_base.weekday()
+                == hoje.weekday()
+            )
+
+        if rep == "Seg/Qua/Sex":
+            return hoje.weekday() in (
+                0,
+                2,
+                4
+            )
+
+        if rep == "Seg a Sex":
+            return hoje.weekday() < 5
+
+        if rep == "Fins de semana":
+            return hoje.weekday() >= 5
+
+        return False
+
+
+    def _inicio_do_dia(self):
+        """
+        Na primeira abertura do MARVIN no dia,
+        mostra o resumo. Nas proximas aberturas,
+        usa apenas a saudacao normal.
+        """
+
+        hoje = (
+            datetime.date.today()
+            .isoformat()
+        )
+
+        if (
+            cfg.get("ultimo_resumo_dia")
+            != hoje
+        ):
+            self._resumo_do_dia()
+
+        else:
+            self._saudacao_inicial()
+
+
+    def _resumo_do_dia(self):
+        # Nunca substitui um lembrete ativo.
+        if self._reminder_queue:
+            return
+
+        # Se estiver escondido, reaparece.
+        self._show_marvin()
+
+        # Se estiver compacto, expande
+        # temporariamente para mostrar o balao.
+        if self._compact_mode:
+            self._expand_compact_for_reminder()
+
+        hoje = datetime.date.today()
+        hoje_iso = hoje.isoformat()
+
+        try:
+            rows = db_listar()
+        except Exception as exc:
+            print(
+                f"[MARVIN] Erro ao gerar resumo: {exc}"
+            )
+            return
+
+        pendentes_hoje = 0
+        atrasadas = 0
+
+        for row in rows:
+            try:
+                (
+                    tid,
+                    texto,
+                    desc,
+                    data,
+                    hora,
+                    rep,
+                    concluida,
+                    lembrado
+                ) = row
+
+            except Exception:
+                continue
+
+            if concluida:
+                continue
+
+            if self._task_due_today(
+                row,
+                hoje
+            ):
+                pendentes_hoje += 1
+                continue
+
+            # Apenas tarefas sem recorrencia
+            # sao consideradas atrasadas.
+            if rep == "Nunca":
+                try:
+                    data_tarefa = (
+                        datetime.date.fromisoformat(
+                            data
+                        )
+                    )
+
+                    if data_tarefa < hoje:
+                        atrasadas += 1
+
+                except Exception:
+                    pass
+
+        concluidas_hoje = (
+            db_streak_hoje()
+        )
+
+        hora = (
+            datetime.datetime.now().hour
+        )
+
+        if hora < 12:
+            saudacao = "Bom dia!"
+
+        elif hora < 18:
+            saudacao = "Boa tarde!"
+
+        else:
+            saudacao = "Boa noite!"
+
+        partes = []
+
+        if pendentes_hoje == 0:
+            partes.append(
+                "Nenhuma tarefa pendente para hoje."
+            )
+
+        elif pendentes_hoje == 1:
+            partes.append(
+                "Voce tem 1 tarefa para hoje."
+            )
+
+        else:
+            partes.append(
+                f"Voce tem {pendentes_hoje} tarefas para hoje."
+            )
+
+        if atrasadas == 1:
+            partes.append(
+                "1 esta atrasada."
+            )
+
+        elif atrasadas > 1:
+            partes.append(
+                f"{atrasadas} estao atrasadas."
+            )
+
+        if concluidas_hoje == 1:
+            partes.append(
+                "1 concluida hoje."
+            )
+
+        elif concluidas_hoje > 1:
+            partes.append(
+                f"{concluidas_hoje} concluidas hoje."
+            )
+
+        mensagem = (
+            saudacao
+            + " "
+            + " ".join(partes)
+        )
+
+        cfg["ultimo_resumo_dia"] = (
+            hoje_iso
+        )
+
+        save_cfg(cfg)
+
+        self._bubble_mode = "normal"
+        self._bubble_hover = None
+
+        self.say(
+            mensagem,
+            "talking",
+            8000
+        )
 
 
     # ── Saudacao ──────────────────────────────────────────────────────────────
