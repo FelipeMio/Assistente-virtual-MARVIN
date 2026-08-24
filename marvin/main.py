@@ -1100,7 +1100,7 @@ class TaskWindow:
     def __init__(self, parent, companion):
         self.comp   = companion
         self.parent = parent
-        self.win    = _make_win(parent, "Tarefas", 440, 520, resizable=True)
+        self.win    = _make_win(parent, "Tarefas", 440, 560, resizable=True)
         self._build()
         _position_near_marvin(self.win, self.comp)
 
@@ -1108,23 +1108,108 @@ class TaskWindow:
         w = self.win
         _header(w, "Tarefas")
 
-        # Filtros
-        # Filtros
-        fbar = tk.Frame(w, bg=C["win_bg"])
-        fbar.pack(fill="x", padx=10, pady=(0, 4))
-        self.filtro = tk.StringVar(value="todas")
-        self.sv = tk.StringVar(value="")
-        for label, val in [("Todas", "todas"),
-                            ("Pendentes", "pendentes"),
-                            ("Concluidas", "concluidas")]:
-            tk.Radiobutton(fbar, text=label,
-                            variable=self.filtro, value=val,
-                            bg=C["win_bg"], fg=C["dim"],
-                            selectcolor=C["panel"],
-                            activebackground=C["win_bg"],
-                            activeforeground=C["text"],
-                            font=("Consolas", 8),
-                            command=self._refresh).pack(side="left", padx=6)
+        # Filtros de status
+        fbar = tk.Frame(
+            w,
+            bg=C["win_bg"]
+        )
+
+        fbar.pack(
+            fill="x",
+            padx=10,
+            pady=(4, 1)
+        )
+
+        tk.Label(
+            fbar,
+            text="Status:",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8, "bold")
+        ).pack(
+            side="left",
+            padx=(4, 6)
+        )
+
+        self.filtro = tk.StringVar(
+            value="todas"
+        )
+
+        self.sv = tk.StringVar(
+            value=""
+        )
+
+        for label, val in [
+            ("Todas", "todas"),
+            ("Pendentes", "pendentes"),
+            ("Concluidas", "concluidas"),
+        ]:
+            tk.Radiobutton(
+                fbar,
+                text=label,
+                variable=self.filtro,
+                value=val,
+                bg=C["win_bg"],
+                fg=C["dim"],
+                selectcolor=C["panel"],
+                activebackground=C["win_bg"],
+                activeforeground=C["text"],
+                font=("Consolas", 8),
+                command=self._refresh
+            ).pack(
+                side="left",
+                padx=4
+            )
+
+        # Filtro de prioridade
+        pbar = tk.Frame(
+            w,
+            bg=C["win_bg"]
+        )
+
+        pbar.pack(
+            fill="x",
+            padx=10,
+            pady=(1, 5)
+        )
+
+        tk.Label(
+            pbar,
+            text="Prioridade:",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8, "bold")
+        ).pack(
+            side="left",
+            padx=(4, 6)
+        )
+
+        self.filtro_prioridade = tk.StringVar(
+            value="todas"
+        )
+
+        for label, val in [
+            ("Todas", "todas"),
+            ("Alta", "Alta"),
+            ("Normal", "Normal"),
+            ("Baixa", "Baixa"),
+        ]:
+            tk.Radiobutton(
+                pbar,
+                text=label,
+                variable=self.filtro_prioridade,
+                value=val,
+                bg=C["win_bg"],
+                fg=C["dim"],
+                selectcolor=C["panel"],
+                activebackground=C["win_bg"],
+                activeforeground=C["text"],
+                font=("Consolas", 8),
+                command=self._refresh
+            ).pack(
+                side="left",
+                padx=4
+            )
 
         # Lista
         outer = tk.Frame(w, bg=C["win_bg"])
@@ -1154,22 +1239,96 @@ class TaskWindow:
         for widget in self.lf.winfo_children():
             widget.destroy()
 
-        rows    = db_listar()
-        filtro  = self.filtro.get()
-        streak  = db_streak_hoje()
-        pending = [r for r in rows if not r[6]]
-        done_l  = [r for r in rows if r[6]]
+        rows = db_listar()
 
-        streak_txt = f"  {streak} concluida(s) hoje" if streak else ""
-        self.sv.set(f"   {len(done_l)}/{len(rows)} concluidas  |  "
-                    f"{len(pending)} pendente(s){streak_txt}")
+        filtro_status = (
+            self.filtro.get()
+        )
 
+        filtro_prioridade = (
+            self.filtro_prioridade.get()
+        )
+
+        streak = db_streak_hoje()
+
+        # Guarda a prioridade uma unica vez
+        # para cada tarefa durante este refresh.
+        prioridades = {
+            row[0]: db_prioridade(row[0])
+            for row in rows
+        }
+
+        # Aplica o filtro de prioridade.
+        if filtro_prioridade != "todas":
+            rows_filtradas = [
+                row
+                for row in rows
+                if prioridades.get(
+                    row[0],
+                    "Normal"
+                ) == filtro_prioridade
+            ]
+        else:
+            rows_filtradas = list(rows)
+
+        pending = [
+            r
+            for r in rows_filtradas
+            if not r[6]
+        ]
+
+        done_l = [
+            r
+            for r in rows_filtradas
+            if r[6]
+        ]
+
+        streak_txt = (
+            f"  {streak} concluida(s) hoje"
+            if streak
+            else ""
+        )
+
+        self.sv.set(
+            f"   {len(done_l)}/"
+            f"{len(rows_filtradas)} concluidas"
+            f"  |  {len(pending)} pendente(s)"
+            f"{streak_txt}"
+        )
+
+        # Nenhuma tarefa no banco.
         if not rows:
-            tk.Label(self.lf,
-                      text="Nenhuma tarefa ainda.\nClique + para criar.",
-                      bg=C["win_bg"], fg=C["dim"],
-                      font=("Consolas", 9, "italic"),
-                      justify="center", pady=30).pack()
+            tk.Label(
+                self.lf,
+                text=(
+                    "Nenhuma tarefa ainda.\n"
+                    "Clique + para criar."
+                ),
+                bg=C["win_bg"],
+                fg=C["dim"],
+                font=("Consolas", 9, "italic"),
+                justify="center",
+                pady=30
+            ).pack()
+
+            return
+
+        # Existem tarefas, mas nenhuma corresponde
+        # ao filtro selecionado.
+        if not rows_filtradas:
+            tk.Label(
+                self.lf,
+                text=(
+                    "Nenhuma tarefa encontrada "
+                    "com esse filtro."
+                ),
+                bg=C["win_bg"],
+                fg=C["dim"],
+                font=("Consolas", 9, "italic"),
+                justify="center",
+                pady=30
+            ).pack()
+
             return
 
         def section(title, lst):
@@ -1183,9 +1342,9 @@ class TaskWindow:
             for row in lst:
                 self._row(row)
 
-        if filtro in ("todas", "pendentes"):
+        if filtro_status in ("todas", "pendentes"):
             section("  TAREFAS PENDENTES", pending)
-        if filtro in ("todas", "concluidas"):
+        if filtro_status in ("todas", "concluidas"):
             section("  TAREFAS CONCLUIDAS", done_l)
 
     def _row(self, row):
