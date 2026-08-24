@@ -1100,7 +1100,7 @@ class TaskWindow:
     def __init__(self, parent, companion):
         self.comp   = companion
         self.parent = parent
-        self.win    = _make_win(parent, "Tarefas", 440, 560, resizable=True)
+        self.win    = _make_win(parent, "Tarefas", 440, 600, resizable=True)
         self._build()
         _position_near_marvin(self.win, self.comp)
 
@@ -1211,6 +1211,57 @@ class TaskWindow:
                 padx=4
             )
 
+        # Busca
+        search_bar = tk.Frame(
+            w,
+            bg=C["win_bg"]
+        )
+
+        search_bar.pack(
+            fill="x",
+            padx=14,
+            pady=(1, 7)
+        )
+
+        tk.Label(
+            search_bar,
+            text="Buscar:",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Consolas", 8, "bold")
+        ).pack(
+            side="left",
+            padx=(0, 8)
+        )
+
+        self.busca = tk.StringVar(
+            value=""
+        )
+
+        self.e_busca = tk.Entry(
+            search_bar,
+            textvariable=self.busca,
+            bg=C["panel"],
+            fg=C["text"],
+            insertbackground=C["accent"],
+            font=("Consolas", 9),
+            bd=0,
+            relief="flat"
+        )
+
+        self.e_busca.pack(
+            side="left",
+            fill="x",
+            expand=True,
+            ipady=5
+        )
+
+        # Atualiza a lista enquanto digita.
+        self.busca.trace_add(
+            "write",
+            lambda *_: self._refresh()
+        )
+
         # Lista
         outer = tk.Frame(w, bg=C["win_bg"])
         outer.pack(fill="both", expand=True)
@@ -1271,6 +1322,25 @@ class TaskWindow:
         else:
             rows_filtradas = list(rows)
 
+        # Aplica busca por titulo ou descricao.
+        termo_busca = (
+            self.busca.get()
+            .strip()
+            .lower()
+        )
+
+        if termo_busca:
+            rows_filtradas = [
+                row
+                for row in rows_filtradas
+                if (
+                    termo_busca
+                    in str(row[1]).lower()
+                    or termo_busca
+                    in str(row[2] or "").lower()
+                )
+            ]
+
         pending = [
             r
             for r in rows_filtradas
@@ -1320,7 +1390,7 @@ class TaskWindow:
                 self.lf,
                 text=(
                     "Nenhuma tarefa encontrada "
-                    "com esse filtro."
+                    "com esse filtro ou busca."
                 ),
                 bg=C["win_bg"],
                 fg=C["dim"],
