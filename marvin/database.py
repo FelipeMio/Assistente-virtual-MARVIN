@@ -30,7 +30,8 @@ def _migrate():
             lembrado     INTEGER DEFAULT 0,
             ativo        INTEGER DEFAULT 1,
             criado_em    TEXT    DEFAULT NULL,
-            concluido_em TEXT    DEFAULT NULL
+            concluido_em TEXT    DEFAULT NULL,
+            prioridade   TEXT    DEFAULT 'Normal'
         )
     """)
 
@@ -43,21 +44,42 @@ def _migrate():
                 f"ALTER TABLE tarefas ADD COLUMN {col} TEXT DEFAULT NULL"
             )
 
+    if "prioridade" not in cols:
+        cursor.execute(
+            "ALTER TABLE tarefas "
+            "ADD COLUMN prioridade TEXT DEFAULT 'Normal'"
+        )
+
     con.commit()
 
 
 _migrate()
 
 
-def db_criar(texto, descricao, data, hora, recorrencia):
+def db_criar(
+    texto,
+    descricao,
+    data,
+    hora,
+    recorrencia,
+    prioridade="Normal"
+):
     with _db_lock:
         agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         cursor.execute(
             "INSERT INTO tarefas "
-            "(texto,descricao,data,hora,recorrencia,criado_em) "
-            "VALUES (?,?,?,?,?,?)",
-            (texto, descricao, data, hora, recorrencia, agora),
+            "(texto,descricao,data,hora,recorrencia,criado_em,prioridade) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (
+                texto,
+                descricao,
+                data,
+                hora,
+                recorrencia,
+                agora,
+                prioridade,
+            ),
         )
 
         con.commit()
@@ -74,10 +96,42 @@ def db_listar(apenas_pendentes=False):
         if apenas_pendentes:
             q += " AND concluida=0"
 
-        q += " ORDER BY data,hora"
+        q += (
+            " ORDER BY "
+            "CASE prioridade "
+            "WHEN 'Alta' THEN 0 "
+            "WHEN 'Normal' THEN 1 "
+            "WHEN 'Baixa' THEN 2 "
+            "ELSE 1 END, "
+            "data,hora"
+        )
 
         cursor.execute(q)
         return cursor.fetchall()
+
+
+def db_prioridade(tid):
+    with _db_lock:
+        cursor.execute(
+            "SELECT prioridade FROM tarefas WHERE id=?",
+            (tid,),
+        )
+
+        row = cursor.fetchone()
+
+        if not row or not row[0]:
+            return "Normal"
+
+        prioridade = str(row[0]).strip()
+
+        if prioridade not in (
+            "Baixa",
+            "Normal",
+            "Alta",
+        ):
+            return "Normal"
+
+        return prioridade
 
 
 def db_concluir(tid):
@@ -190,7 +244,7 @@ def db_limpar_antigas(dias=30):
 def db_obter(tid):
     with _db_lock:
         cursor.execute(
-            "SELECT texto,descricao,data,hora,recorrencia "
+            "SELECT texto,descricao,data,hora,recorrencia,prioridade "
             "FROM tarefas WHERE id=?",
             (tid,),
         )

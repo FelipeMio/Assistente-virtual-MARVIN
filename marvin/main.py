@@ -20,6 +20,7 @@ from marvin.database import (
     db_excluir,
     db_alterar,
     db_obter,
+    db_prioridade,
     db_marcar_lembrado,
     db_reset_lembrado,
     db_adiar,
@@ -571,6 +572,12 @@ def _frase_saudacao(n):
 REPEAT_OPTS = ["Nunca", "Todo dia", "Toda semana",
                "Seg/Qua/Sex", "Seg a Sex", "Fins de semana"]
 
+PRIORITY_OPTS = [
+    "Baixa",
+    "Normal",
+    "Alta",
+]
+
 
 def _make_win(parent, title, w, h, resizable=False):
     win = tk.Toplevel(parent)
@@ -709,6 +716,39 @@ def _option_menu(parent, var):
     return opt
 
 
+def _priority_menu(parent, var):
+    opt = tk.OptionMenu(
+        parent,
+        var,
+        *PRIORITY_OPTS
+    )
+
+    opt.config(
+        bg=C["panel"],
+        fg=C["text"],
+        activebackground=C["border"],
+        activeforeground=C["text"],
+        font=("Consolas", 9),
+        highlightthickness=0,
+        bd=0
+    )
+
+    opt["menu"].config(
+        bg=C["panel"],
+        fg=C["text"],
+        activebackground=C["border"],
+        activeforeground=C["text"],
+        font=("Consolas", 9)
+    )
+
+    opt.pack(
+        fill="x",
+        ipady=4
+    )
+
+    return opt
+
+
 def _validate_date(s):
     try:
         return datetime.datetime.strptime(s.strip(), "%d/%m/%Y").strftime("%Y-%m-%d")
@@ -723,31 +763,34 @@ def _validate_time(s):
     except ValueError:
         return None
 
-def _bind_auto_time(var):
+def _bind_auto_time(entry, var):
     """
-    Permite digitar horario somente com numeros.
+    Formata horario enquanto o usuario digita.
 
-    Exemplo:
-        1830 -> 18:30
-        0745 -> 07:45
+    Exemplos:
+        14 + 40 -> 14:40
+        1830    -> 18:30
+
+    Mantem o cursor no final para evitar
+    14:40 virar 14:04.
     """
 
-    controle = {"alterando": False}
+    controle = {
+        "alterando": False
+    }
 
-    def formatar(*_):
+    def formatar(event=None):
         if controle["alterando"]:
             return
 
         atual = var.get()
 
-        # Mantem somente numeros e no maximo HHMM.
         digitos = "".join(
-            ch for ch in atual
+            ch
+            for ch in atual
             if ch.isdigit()
         )[:4]
 
-        # O ":" aparece automaticamente quando
-        # o usuario comeca a digitar os minutos.
         if len(digitos) <= 2:
             novo = digitos
         else:
@@ -757,17 +800,46 @@ def _bind_auto_time(var):
                 + digitos[2:]
             )
 
-        if novo == atual:
-            return
+        if novo != atual:
+            controle["alterando"] = True
 
-        controle["alterando"] = True
+            try:
+                var.set(novo)
+            finally:
+                controle["alterando"] = False
 
+        # O ponto principal da correcao:
+        # depois da formatacao, mantem o cursor
+        # depois do ultimo caractere.
         try:
-            var.set(novo)
-        finally:
-            controle["alterando"] = False
+            entry.icursor("end")
+        except Exception:
+            pass
 
-    var.trace_add("write", formatar)
+    # Formata somente depois da tecla ser processada.
+    entry.bind(
+        "<KeyRelease>",
+        formatar,
+        add="+"
+    )
+
+    # Tambem funciona ao colar um horario.
+    entry.bind(
+        "<<Paste>>",
+        lambda e: entry.after_idle(
+            formatar
+        ),
+        add="+"
+    )
+
+    # Garante formato correto ao sair do campo.
+    entry.bind(
+        "<FocusOut>",
+        formatar,
+        add="+"
+    )
+
+
 
 
 #  JANELA: NOVA TAREFA
@@ -775,7 +847,7 @@ def _bind_auto_time(var):
 class NewTaskWindow:
     def __init__(self, parent, companion, prefill=""):
         self.comp = companion
-        self.win  = _make_win(parent, "Nova Tarefa", 400, 385)
+        self.win  = _make_win(parent, "Nova Tarefa", 400, 430)
         self.win.grab_set()
         self._build(prefill)
         self._position_near_marvin()
@@ -915,7 +987,10 @@ class NewTaskWindow:
         self.e_hora.pack(ipady=6)
 
         # Digitar 1830 vira automaticamente 18:30.
-        _bind_auto_time(self.v_hora)
+        _bind_auto_time(
+            self.e_hora,
+            self.v_hora
+        )
 
         self.v_data.trace_add("write", self._validate_live)
         self.v_hora.trace_add("write", self._validate_live)
@@ -923,6 +998,15 @@ class NewTaskWindow:
         _lbl(body, "Repeticao")
         self.v_rep = tk.StringVar(value=REPEAT_OPTS[0])
         _option_menu(body, self.v_rep)
+
+        _lbl(body, "Prioridade")
+        self.v_prioridade = tk.StringVar(
+            value="Normal"
+        )
+        _priority_menu(
+            body,
+            self.v_prioridade
+        )
 
         self.v_err = tk.StringVar()
         tk.Label(body, textvariable=self.v_err, bg=C["win_bg"], fg=C["red"],
@@ -1004,6 +1088,7 @@ class NewTaskWindow:
             data,
             hora,
             self.v_rep.get(),
+            self.v_prioridade.get(),
         )
 
         self.comp.say("Tarefa criada!", "talking", 2000)
@@ -1105,7 +1190,16 @@ class TaskWindow:
 
     def _row(self, row):
         tid, texto, desc, data, hora, rep, concluida, lembrado = row
-        bg    = C["panel"] if not concluida else C["win_bg"]
+
+        prioridade = db_prioridade(
+            tid
+        )
+
+        bg = (
+            C["panel"]
+            if not concluida
+            else C["win_bg"]
+        )
         row_f = tk.Frame(self.lf, bg=bg)
         row_f.pack(fill="x", pady=2, padx=6)
 
@@ -1118,12 +1212,41 @@ class TaskWindow:
 
         info = tk.Frame(row_f, bg=bg)
         info.pack(side="left", fill="x", expand=True, pady=5)
-        tk.Label(info, text=texto, bg=bg,
-                  fg=C["dim"] if concluida else C["text"],
-                  font=("Consolas", 9), anchor="w",
-                  wraplength=220, justify="left").pack(anchor="w")
+        if concluida:
+            titulo_fg = C["dim"]
+
+        elif prioridade == "Alta":
+            titulo_fg = C["red"]
+
+        elif prioridade == "Baixa":
+            titulo_fg = C["dim"]
+
+        else:
+            titulo_fg = C["text"]
+
+        tk.Label(
+            info,
+            text=texto,
+            bg=bg,
+            fg=titulo_fg,
+            font=("Consolas", 9),
+            anchor="w",
+            wraplength=220,
+            justify="left"
+        ).pack(
+            anchor="w"
+        )
 
         parts = []
+
+        if prioridade == "Alta":
+            parts.append("! ALTA")
+
+        elif prioridade == "Baixa":
+            parts.append("BAIXA")
+
+        else:
+            parts.append("NORMAL")
         try:
             d    = datetime.date.fromisoformat(data)
             hoje = datetime.date.today()
@@ -1193,13 +1316,28 @@ class EditTaskWindow:
         row = db_obter(tid)
         if not row:
             return
-        texto, desc, data, hora, rep = row
-        self.win = _make_win(parent, "Editar Tarefa", 400, 370)
+        texto, desc, data, hora, rep, prioridade = row
+        self.win = _make_win(parent, "Editar Tarefa", 400, 415)
         self.win.grab_set()
-        self._build(texto, desc, data, hora, rep)
+        self._build(
+            texto,
+            desc,
+            data,
+            hora,
+            rep,
+            prioridade
+        )
         _position_near_marvin(self.win, self.comp)
 
-    def _build(self, texto, desc, data, hora, rep):
+    def _build(
+        self,
+        texto,
+        desc,
+        data,
+        hora,
+        rep,
+        prioridade
+    ):
         w = self.win
         _header(w, "Editar Tarefa")
         body = tk.Frame(w, bg=C["win_bg"])
@@ -1230,14 +1368,35 @@ class EditTaskWindow:
                   bg=C["win_bg"], fg=C["dim"],
                   font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
         self.v_hora = tk.StringVar(value=hora[:5])
-        _entry(Rf, self.v_hora, width=7)
+        self.e_hora = _entry(
+            Rf,
+            self.v_hora,
+            width=7
+        )
 
         # Digitar 1830 vira automaticamente 18:30.
-        _bind_auto_time(self.v_hora)
+        _bind_auto_time(
+            self.e_hora,
+            self.v_hora
+        )
 
         _lbl(body, "Repeticao")
         self.v_rep = tk.StringVar(value=rep)
         _option_menu(body, self.v_rep)
+
+        _lbl(body, "Prioridade")
+        self.v_prioridade = tk.StringVar(
+            value=(
+                prioridade
+                if prioridade in PRIORITY_OPTS
+                else "Normal"
+            )
+        )
+
+        _priority_menu(
+            body,
+            self.v_prioridade
+        )
 
         self.v_err = tk.StringVar()
         tk.Label(body, textvariable=self.v_err, bg=C["win_bg"], fg=C["red"],
@@ -1272,6 +1431,11 @@ class EditTaskWindow:
         db_alterar(self.tid, "data",        self.v_data.get().strip())
         db_alterar(self.tid, "hora",        self.v_hora.get().strip())
         db_alterar(self.tid, "recorrencia", self.v_rep.get())
+        db_alterar(
+            self.tid,
+            "prioridade",
+            self.v_prioridade.get()
+        )
         db_alterar(self.tid, "lembrado",    0)
         self.callback()
         self.comp.say("Tarefa editada!", "talking", 2000)
