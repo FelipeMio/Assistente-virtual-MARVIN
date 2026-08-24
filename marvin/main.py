@@ -2028,7 +2028,7 @@ class MarvinCompanion:
     W, H = 180, 260
 
     COMPACT_W = 100
-    COMPACT_H = 72
+    COMPACT_H = 80
 
     # Tempo total desde que o lembrete apareceu.
     # 1min -> imagem 01
@@ -2115,6 +2115,12 @@ class MarvinCompanion:
         self._compact_last_frame = time.monotonic()
         self._compact_sequence = [0, 0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 2, 0]
         self._normal_pos = None
+
+        # Controle exclusivo do modo compacto.
+        self._compact_drag_active = False
+        self._compact_drag_offset_x = 0
+        self._compact_drag_start = None
+        self._compact_has_position = False
 
         # Estado
         self.t               = 0.0
@@ -2415,10 +2421,12 @@ class MarvinCompanion:
         lembretes e bandeja funcionando.
         """
         try:
-            cfg["pos_x"] = self.root.winfo_x()
-            cfg["pos_y"] = self.root.winfo_y()
-
-            save_cfg(cfg)
+            if self._compact_mode:
+                self._save_compact_position()
+            else:
+                cfg["pos_x"] = self.root.winfo_x()
+                cfg["pos_y"] = self.root.winfo_y()
+                save_cfg(cfg)
 
             self.root.withdraw()
             self._is_hidden = True
@@ -2451,6 +2459,513 @@ class MarvinCompanion:
         SettingsWindow(
             self.root,
             self
+        )
+
+
+    # ── Modo compacto nativo do Windows ─────────────────────────────────────
+
+    def _win32_root_hwnd(self):
+        """
+        Retorna o HWND real da janela principal.
+        O winfo_id() pode apontar para uma janela filha
+        interna do Tkinter.
+        """
+        if sys.platform != "win32":
+            return None
+
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+
+            user32.GetAncestor.argtypes = [
+                wintypes.HWND,
+                wintypes.UINT,
+            ]
+            user32.GetAncestor.restype = wintypes.HWND
+
+            hwnd = self.root.winfo_id()
+
+            GA_ROOT = 2
+
+            root_hwnd = user32.GetAncestor(
+                hwnd,
+                GA_ROOT
+            )
+
+            return root_hwnd or hwnd
+
+        except Exception as exc:
+            print(
+                f"[MARVIN] Erro ao obter HWND: {exc}"
+            )
+            return None
+
+
+    def _win32_cursor_pos(self):
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                point = wintypes.POINT()
+
+                if ctypes.windll.user32.GetCursorPos(
+                    ctypes.byref(point)
+                ):
+                    return (
+                        point.x,
+                        point.y
+                    )
+
+            except Exception:
+                pass
+
+        return (
+            self.root.winfo_pointerx(),
+            self.root.winfo_pointery()
+        )
+
+
+    def _win32_workarea_from_point(self, x, y):
+        """
+        Retorna:
+        left, top, right, bottom
+
+        usando as coordenadas do desktop virtual.
+        """
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                class MONITORINFO(ctypes.Structure):
+                    _fields_ = [
+                        ("cbSize", wintypes.DWORD),
+                        ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT),
+                        ("dwFlags", wintypes.DWORD),
+                    ]
+
+                user32 = ctypes.windll.user32
+
+                user32.MonitorFromPoint.argtypes = [
+                    wintypes.POINT,
+                    wintypes.DWORD,
+                ]
+                user32.MonitorFromPoint.restype = (
+                    ctypes.c_void_p
+                )
+
+                user32.GetMonitorInfoW.argtypes = [
+                    ctypes.c_void_p,
+                    ctypes.POINTER(MONITORINFO),
+                ]
+                user32.GetMonitorInfoW.restype = (
+                    wintypes.BOOL
+                )
+
+                point = wintypes.POINT(
+                    int(x),
+                    int(y)
+                )
+
+                monitor = user32.MonitorFromPoint(
+                    point,
+                    2
+                )
+
+                info = MONITORINFO()
+                info.cbSize = ctypes.sizeof(
+                    MONITORINFO
+                )
+
+                if (
+                    monitor
+                    and user32.GetMonitorInfoW(
+                        monitor,
+                        ctypes.byref(info)
+                    )
+                ):
+                    return (
+                        info.rcWork.left,
+                        info.rcWork.top,
+                        info.rcWork.right,
+                        info.rcWork.bottom,
+                    )
+
+            except Exception as exc:
+                print(
+                    f"[MARVIN] Erro ao detectar monitor: {exc}"
+                )
+
+        return (
+            0,
+            0,
+            self.root.winfo_screenwidth(),
+            self.root.winfo_screenheight()
+        )
+
+
+    def _win32_window_rect(self):
+        hwnd = self._win32_root_hwnd()
+
+        if hwnd is not None:
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                rect = wintypes.RECT()
+
+                if ctypes.windll.user32.GetWindowRect(
+                    hwnd,
+                    ctypes.byref(rect)
+                ):
+                    return (
+                        rect.left,
+                        rect.top,
+                        rect.right,
+                        rect.bottom,
+                    )
+
+            except Exception:
+                pass
+
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+
+        return (
+            x,
+            y,
+            x + self.root.winfo_width(),
+            y + self.root.winfo_height()
+        )
+
+
+    def _win32_move_resize(self, x, y, width, height):
+        """
+        Move a janela usando coordenadas absolutas reais,
+        inclusive X negativo em monitores à esquerda.
+        """
+        hwnd = self._win32_root_hwnd()
+
+        if (
+            sys.platform == "win32"
+            and hwnd is not None
+        ):
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                user32 = ctypes.windll.user32
+
+                user32.SetWindowPos.argtypes = [
+                    wintypes.HWND,
+                    wintypes.HWND,
+                    ctypes.c_int,
+                    ctypes.c_int,
+                    ctypes.c_int,
+                    ctypes.c_int,
+                    wintypes.UINT,
+                ]
+
+                user32.SetWindowPos.restype = (
+                    wintypes.BOOL
+                )
+
+                SWP_NOZORDER = 0x0004
+                SWP_NOACTIVATE = 0x0010
+                SWP_SHOWWINDOW = 0x0040
+
+                ok = user32.SetWindowPos(
+                    hwnd,
+                    None,
+                    int(x),
+                    int(y),
+                    int(width),
+                    int(height),
+                    SWP_NOZORDER
+                    | SWP_NOACTIVATE
+                    | SWP_SHOWWINDOW
+                )
+
+                if ok:
+                    return True
+
+            except Exception as exc:
+                print(
+                    f"[MARVIN] Erro ao mover janela: {exc}"
+                )
+
+        return False
+
+
+    def _save_compact_position(self):
+        left, top, right, bottom = (
+            self._win32_window_rect()
+        )
+
+        cfg["pos_compact_x"] = int(left)
+        cfg["pos_compact_y"] = int(top)
+
+        self._compact_has_position = True
+
+        save_cfg(cfg)
+
+
+    def _enter_compact_layout(
+        self,
+        remember_normal=False
+    ):
+        if remember_normal:
+            rect = self._win32_window_rect()
+
+            self._normal_pos = (
+                rect[0],
+                rect[1]
+            )
+
+            cfg["pos_x"] = rect[0]
+            cfg["pos_y"] = rect[1]
+
+        # Na primeira ativacao desta execucao,
+        # ignora posicoes antigas possivelmente
+        # deixadas pelos testes anteriores.
+        if self._compact_has_position:
+            compact_x = cfg.get(
+                "pos_compact_x"
+            )
+            compact_y = cfg.get(
+                "pos_compact_y"
+            )
+        else:
+            rect = self._win32_window_rect()
+
+            compact_x = rect[0]
+            compact_y = rect[1]
+
+        if not isinstance(compact_x, int):
+            compact_x = self.root.winfo_x()
+
+        if not isinstance(compact_y, int):
+            compact_y = self.root.winfo_y()
+
+        left, top, right, bottom = (
+            self._win32_workarea_from_point(
+                compact_x + self.COMPACT_W // 2,
+                compact_y
+            )
+        )
+
+        compact_x = max(
+            left,
+            min(
+                compact_x,
+                right - self.COMPACT_W
+            )
+        )
+
+        compact_y = (
+            bottom - self.COMPACT_H
+        )
+
+        self._compact_mode = True
+
+        self.cv.config(
+            width=self.COMPACT_W,
+            height=self.COMPACT_H
+        )
+
+        self._win32_move_resize(
+            compact_x,
+            compact_y,
+            self.COMPACT_W,
+            self.COMPACT_H
+        )
+
+        cfg["pos_compact_x"] = compact_x
+        cfg["pos_compact_y"] = compact_y
+
+        self._compact_has_position = True
+
+        save_cfg(cfg)
+
+
+    def _restore_normal_layout(self):
+        self._compact_drag_active = False
+        self._compact_mode = False
+
+        self.cv.config(
+            width=self.W,
+            height=self.H
+        )
+
+        pos = self._normal_pos
+
+        if pos is None:
+            px = cfg.get("pos_x")
+            py = cfg.get("pos_y")
+
+            if (
+                isinstance(px, int)
+                and isinstance(py, int)
+            ):
+                pos = (px, py)
+
+        if pos is None:
+            pos = (
+                self.root.winfo_x(),
+                self.root.winfo_y()
+            )
+
+        self._win32_move_resize(
+            pos[0],
+            pos[1],
+            self.W,
+            self.H
+        )
+
+
+    def _expand_compact_for_reminder(self):
+        """
+        Expande o MARVIN no mesmo monitor em que
+        a cabeça compacta está.
+        """
+        rect = self._win32_window_rect()
+
+        compact_x = rect[0]
+        compact_y = rect[1]
+
+        cfg["pos_compact_x"] = compact_x
+        cfg["pos_compact_y"] = compact_y
+
+        self._compact_has_position = True
+        self._compact_drag_active = False
+        self._compact_mode = False
+
+        left, top, right, bottom = (
+            self._win32_workarea_from_point(
+                compact_x + self.COMPACT_W // 2,
+                compact_y + self.COMPACT_H // 2
+            )
+        )
+
+        x = max(
+            left,
+            min(
+                compact_x,
+                right - self.W
+            )
+        )
+
+        y = max(
+            top,
+            bottom - self.H
+        )
+
+        self.cv.config(
+            width=self.W,
+            height=self.H
+        )
+
+        self._win32_move_resize(
+            x,
+            y,
+            self.W,
+            self.H
+        )
+
+        save_cfg(cfg)
+
+
+    def _finish_compact_drag(self):
+        if not self._compact_drag_active:
+            return
+
+        self._compact_drag_active = False
+        self._save_compact_position()
+
+
+    def _compact_drag_tick(self):
+        """
+        Arraste global: continua funcionando mesmo quando
+        o mouse sai da janela e atravessa para outro monitor.
+        """
+        if (
+            not self._compact_drag_active
+            or not self._compact_mode
+        ):
+            return
+
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                # Se o botao esquerdo foi solto,
+                # encerra mesmo que o Tkinter nao receba
+                # ButtonRelease na outra tela.
+                if not (
+                    ctypes.windll.user32.GetAsyncKeyState(
+                        0x01
+                    ) & 0x8000
+                ):
+                    self._finish_compact_drag()
+                    return
+
+            except Exception:
+                pass
+
+        mouse_x, mouse_y = (
+            self._win32_cursor_pos()
+        )
+
+        if self._compact_drag_start:
+            sx, sy = self._compact_drag_start
+
+            dist = (
+                abs(mouse_x - sx)
+                + abs(mouse_y - sy)
+            )
+
+            if dist > 4:
+                self._dragging = True
+                self._drag_dist = dist
+
+        left, top, right, bottom = (
+            self._win32_workarea_from_point(
+                mouse_x,
+                mouse_y
+            )
+        )
+
+        x = (
+            mouse_x
+            - self._compact_drag_offset_x
+        )
+
+        x = max(
+            left,
+            min(
+                x,
+                right - self.COMPACT_W
+            )
+        )
+
+        y = (
+            bottom - self.COMPACT_H
+        )
+
+        self._win32_move_resize(
+            x,
+            y,
+            self.COMPACT_W,
+            self.COMPACT_H
+        )
+
+        self.root.after(
+            16,
+            self._compact_drag_tick
         )
 
 
@@ -3085,10 +3600,13 @@ class MarvinCompanion:
 
         self.cv.delete("all")
 
-        # Mantem a mesma janela do MARVIN.
-        # Apenas mostra a cabeca no lugar do personagem inteiro.
-        x = self.W // 2
-        bottom_y = self.H - 8
+        # Janela compacta real.
+        x = self.COMPACT_W // 2
+
+        # 1 px acima da borda inferior:
+        # visualmente fica encostado na barra
+        # sem cortar o sprite.
+        bottom_y = self.COMPACT_H - 1
 
         self.cv.create_image(
             x,
@@ -3109,13 +3627,9 @@ class MarvinCompanion:
         return "Modo compacto"
 
     def _toggle_np(self):
-        self._compact_enabled = not self._compact_enabled
+        ativando = not self._compact_enabled
 
-        # Se ativou, mostra imediatamente o modo compacto.
-        if self._compact_enabled:
-            self._compact_mode = True
-        else:
-            self._compact_mode = False
+        self._compact_enabled = ativando
 
         self.bubble = ""
         self.b_timer = 0
@@ -3126,12 +3640,23 @@ class MarvinCompanion:
         self._compact_frame_index = 0
         self._compact_last_frame = time.monotonic()
 
+        if ativando:
+            # Durante lembrete, apenas guarda
+            # a preferencia para voltar depois.
+            if not self._reminder_queue:
+                self._enter_compact_layout(
+                    remember_normal=True
+                )
+
+        else:
+            if self._compact_mode:
+                self._restore_normal_layout()
+
         self.ctx.entryconfig(
             3,
             label=self._np_label()
         )
 
-        # Atualiza a marcacao no menu da bandeja.
         if self._tray_icon is not None:
             try:
                 self._tray_icon.update_menu()
@@ -3242,9 +3767,12 @@ class MarvinCompanion:
             and self.state == "idle"
             and not self.bubble
         ):
-            self._compact_mode = True
             self._compact_frame_index = 0
             self._compact_last_frame = time.monotonic()
+
+            self._enter_compact_layout(
+                remember_normal=False
+            )
 
         # Modo compacto: somente desenha os frames da cabeca.
         if self._compact_mode:
@@ -3337,17 +3865,51 @@ class MarvinCompanion:
 
     def _drag_start(self, e):
         self._dx, self._dy = e.x, e.y
-        self._drag_dist    = 0
+        self._drag_dist = 0
+
+        if self._compact_mode:
+            mouse_x, mouse_y = (
+                self._win32_cursor_pos()
+            )
+
+            rect = self._win32_window_rect()
+
+            self._compact_drag_offset_x = (
+                mouse_x - rect[0]
+            )
+
+            self._compact_drag_start = (
+                mouse_x,
+                mouse_y
+            )
+
+            self._compact_drag_active = True
+
+            self._compact_drag_tick()
+
 
     def _drag_move(self, e):
+        # Compacto usa o loop global do Windows.
+        if self._compact_mode:
+            return
+
         dx = e.x - self._dx
         dy = e.y - self._dy
-        self._drag_dist += abs(dx) + abs(dy)
+
+        self._drag_dist += (
+            abs(dx) + abs(dy)
+        )
+
         if self._drag_dist > 4:
             self._dragging = True
+
         x = self.root.winfo_x() + dx
         y = self.root.winfo_y() + dy
-        self.root.geometry(f"+{x}+{y}")
+
+        self.root.geometry(
+            f"+{x}+{y}"
+        )
+
 
     def _bubble_button_at(self, x, y):
         """
@@ -3474,9 +4036,21 @@ class MarvinCompanion:
         return None
 
     def _drag_end(self, e):
-        cfg["pos_x"] = self.root.winfo_x()
-        cfg["pos_y"] = self.root.winfo_y()
-        save_cfg(cfg)
+        if self._compact_mode:
+            self._compact_drag_active = False
+            self._compact_drag_start = None
+            self._save_compact_position()
+
+        else:
+            cfg["pos_x"] = self.root.winfo_x()
+            cfg["pos_y"] = self.root.winfo_y()
+
+            self._normal_pos = (
+                cfg["pos_x"],
+                cfg["pos_y"]
+            )
+
+            save_cfg(cfg)
 
         if not self._dragging:
             button = self._bubble_button_at(e.x, e.y)
@@ -3635,8 +4209,11 @@ class MarvinCompanion:
         # Se o usuario estiver usando modo compacto,
         # mostra temporariamente o MARVIN inteiro durante o alerta.
         # A preferencia _compact_enabled continua ativa.
-        if self._compact_enabled:
-            self._compact_mode = False
+        if (
+            self._compact_enabled
+            and self._compact_mode
+        ):
+            self._expand_compact_for_reminder()
 
         # Se ja existe um alerta na tela,
         # apenas adiciona esta tarefa na fila.
@@ -3672,9 +4249,12 @@ class MarvinCompanion:
         """Encerra completamente o MARVIN."""
 
         try:
-            cfg["pos_x"] = self.root.winfo_x()
-            cfg["pos_y"] = self.root.winfo_y()
-            save_cfg(cfg)
+            if self._compact_mode:
+                self._save_compact_position()
+            else:
+                cfg["pos_x"] = self.root.winfo_x()
+                cfg["pos_y"] = self.root.winfo_y()
+                save_cfg(cfg)
         except Exception:
             pass
 

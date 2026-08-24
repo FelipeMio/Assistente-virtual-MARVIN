@@ -11,6 +11,8 @@ CFG_F = HOME / "config.json"
 CFG_DEFAULTS = {
     "pos_x": None,
     "pos_y": None,
+    "pos_compact_x": None,
+    "pos_compact_y": None,
     "nao_perturbe": False,
     "som": True,
     "opacidade": 1.0,
