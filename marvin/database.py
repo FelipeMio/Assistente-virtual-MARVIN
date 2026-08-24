@@ -31,7 +31,9 @@ def _migrate():
             ativo        INTEGER DEFAULT 1,
             criado_em    TEXT    DEFAULT NULL,
             concluido_em TEXT    DEFAULT NULL,
-            prioridade   TEXT    DEFAULT 'Normal'
+            prioridade   TEXT    DEFAULT 'Normal',
+            data_base    TEXT    DEFAULT NULL,
+            hora_base    TEXT    DEFAULT NULL
         )
     """)
 
@@ -49,6 +51,32 @@ def _migrate():
             "ALTER TABLE tarefas "
             "ADD COLUMN prioridade TEXT DEFAULT 'Normal'"
         )
+
+    if "data_base" not in cols:
+        cursor.execute(
+            "ALTER TABLE tarefas "
+            "ADD COLUMN data_base TEXT DEFAULT NULL"
+        )
+
+    if "hora_base" not in cols:
+        cursor.execute(
+            "ALTER TABLE tarefas "
+            "ADD COLUMN hora_base TEXT DEFAULT NULL"
+        )
+
+    # Tarefas antigas passam a usar sua data/hora atual
+    # como programacao original.
+    cursor.execute(
+        "UPDATE tarefas "
+        "SET data_base=data "
+        "WHERE data_base IS NULL OR data_base=''"
+    )
+
+    cursor.execute(
+        "UPDATE tarefas "
+        "SET hora_base=hora "
+        "WHERE hora_base IS NULL OR hora_base=''"
+    )
 
     con.commit()
 
@@ -69,8 +97,9 @@ def db_criar(
 
         cursor.execute(
             "INSERT INTO tarefas "
-            "(texto,descricao,data,hora,recorrencia,criado_em,prioridade) "
-            "VALUES (?,?,?,?,?,?,?)",
+            "(texto,descricao,data,hora,recorrencia,criado_em,prioridade,"
+            "data_base,hora_base) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 texto,
                 descricao,
@@ -79,6 +108,8 @@ def db_criar(
                 recorrencia,
                 agora,
                 prioridade,
+                data,
+                hora,
             ),
         )
 
@@ -134,7 +165,11 @@ def db_prioridade(tid):
         return prioridade
 
 
-def _proxima_data_recorrente(data_atual, recorrencia):
+def _proxima_data_recorrente(
+    data_atual,
+    recorrencia,
+    data_base=None
+):
     """
     Calcula a proxima ocorrencia de uma tarefa recorrente.
 
@@ -155,8 +190,16 @@ def _proxima_data_recorrente(data_atual, recorrencia):
         return base + datetime.timedelta(days=1)
 
     if recorrencia == "Toda semana":
-        # Mantem o mesmo dia da semana da data original.
-        alvo = original.weekday()
+        # Mantem o dia da semana original mesmo que
+        # esta ocorrencia tenha sido adiada.
+        try:
+            ancora = datetime.date.fromisoformat(
+                data_base
+            )
+        except (TypeError, ValueError):
+            ancora = original
+
+        alvo = ancora.weekday()
 
         candidato = base + datetime.timedelta(days=1)
 
@@ -190,7 +233,7 @@ def db_concluir(tid):
 
     with _db_lock:
         cursor.execute(
-            "SELECT data, recorrencia "
+            "SELECT data,hora,recorrencia,data_base,hora_base "
             "FROM tarefas WHERE id=?",
             (tid,),
         )
@@ -200,7 +243,13 @@ def db_concluir(tid):
         if not row:
             return
 
-        data_atual, recorrencia = row
+        (
+            data_atual,
+            hora_atual,
+            recorrencia,
+            data_base,
+            hora_base,
+        ) = row
 
         # Tarefa comum: comportamento antigo.
         if recorrencia == "Nunca":
@@ -215,6 +264,7 @@ def db_concluir(tid):
             proxima = _proxima_data_recorrente(
                 data_atual,
                 recorrencia,
+                data_base,
             )
 
             if proxima is None:
@@ -232,12 +282,14 @@ def db_concluir(tid):
                 cursor.execute(
                     "UPDATE tarefas "
                     "SET data=?, "
+                    "hora=?, "
                     "concluida=0, "
                     "lembrado=0, "
                     "concluido_em=? "
                     "WHERE id=?",
                     (
                         proxima.isoformat(),
+                        hora_base or hora_atual,
                         agora,
                         tid,
                     ),
@@ -267,11 +319,42 @@ def db_excluir(tid):
 
 
 def db_alterar(tid, campo, valor):
-    with _db_lock:
-        cursor.execute(
-            f"UPDATE tarefas SET {campo}=? WHERE id=?",
-            (valor, tid),
+    campos_validos = {
+        "texto",
+        "descricao",
+        "data",
+        "hora",
+        "recorrencia",
+        "prioridade",
+    }
+
+    if campo not in campos_validos:
+        raise ValueError(
+            f"Campo invalido: {campo}"
         )
+
+    with _db_lock:
+        if campo == "data":
+            cursor.execute(
+                "UPDATE tarefas "
+                "SET data=?,data_base=? "
+                "WHERE id=?",
+                (valor, valor, tid),
+            )
+
+        elif campo == "hora":
+            cursor.execute(
+                "UPDATE tarefas "
+                "SET hora=?,hora_base=? "
+                "WHERE id=?",
+                (valor, valor, tid),
+            )
+
+        else:
+            cursor.execute(
+                f"UPDATE tarefas SET {campo}=? WHERE id=?",
+                (valor, tid),
+            )
 
         con.commit()
 
