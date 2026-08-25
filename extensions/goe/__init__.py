@@ -1,9 +1,10 @@
-﻿import json
+import json
 import sys
 import tkinter as tk
 from pathlib import Path
 
 from .monitor import GOEMonitor
+from .dashboard import abrir_dashboard
 
 
 EXTENSION_DIR = Path(__file__).resolve().parent
@@ -404,6 +405,21 @@ def iniciar_extensao(comp):
     )
 
     monitor.start()
+
+    # Registra a interface publica da extensao
+    # para a Central do MARVIN.
+    if not hasattr(
+        comp,
+        "_extension_actions",
+    ):
+        comp._extension_actions = {}
+
+    comp._extension_actions[
+        "GOE hora a hora"
+    ] = lambda: abrir_dashboard(
+        comp.root,
+        comp,
+    )
 
     print(
         "[GOE] Monitor iniciado."

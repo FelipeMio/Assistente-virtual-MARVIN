@@ -10,8 +10,11 @@ except ImportError:
     pystray = None
 
 from .config import load_cfg, save_cfg
+from .theme import get_palette
 
 from .extension_loader import carregar_extensoes
+from .checklist import abrir_checklist
+from .ui.home import abrir_home
 
 from marvin.database import (
     DB_F,
@@ -154,19 +157,11 @@ def _set_startup_enabled(enabled):
 
 TK = "#010203"  # cor de transparencia Windows
 
-C = dict(
-    win_bg  = "#0d1117",
-    panel   = "#161b22",
-    border  = "#30363d",
-    text    = "#e6edf3",
-    dim     = "#7d8590",
-    accent  = "#58a6ff",
-    green   = "#3fb950",
-    red     = "#f85149",
-    orange  = "#d29922",
-    purple  = "#bc8cff",
-    bub_bg  = "#161b22",
-    bub_bd  = "#58a6ff",
+C = get_palette(
+    cfg.get(
+        "tema",
+        "escuro"
+    )
 )
 
 # ============================================================
@@ -1893,6 +1888,65 @@ class SettingsWindow:
         body = tk.Frame(w, bg=C["win_bg"])
         body.pack(fill="both", expand=True, padx=20, pady=14)
 
+        # Aparencia
+        tk.Label(
+            body,
+            text="Aparencia",
+            bg=C["win_bg"],
+            fg=C["dim"],
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w",
+            pady=(0, 5)
+        )
+
+        self.v_tema = tk.StringVar(
+            value=cfg.get(
+                "tema",
+                "escuro"
+            )
+        )
+
+        tema_row = tk.Frame(
+            body,
+            bg=C["win_bg"]
+        )
+
+        tema_row.pack(
+            fill="x",
+            pady=(0, 8)
+        )
+
+        for texto, valor in (
+            ("Escuro", "escuro"),
+            ("Claro", "claro"),
+        ):
+            tk.Radiobutton(
+                tema_row,
+                text=texto,
+                variable=self.v_tema,
+                value=valor,
+                bg=C["win_bg"],
+                fg=C["text"],
+                selectcolor=C["panel"],
+                activebackground=C["win_bg"],
+                activeforeground=C["text"],
+                font=("Segoe UI", 9),
+                cursor="hand2"
+            ).pack(
+                side="left",
+                padx=(0, 14)
+            )
+
+        tk.Frame(
+            body,
+            bg=C["border"],
+            height=1
+        ).pack(
+            fill="x",
+            pady=(0, 10)
+        )
+
         # Som
         self.v_som = tk.BooleanVar(value=cfg.get("som", True))
         r2 = tk.Frame(body, bg=C["win_bg"])
@@ -2167,6 +2221,13 @@ class SettingsWindow:
 
 
     def _salvar(self):
+        tema_anterior = cfg.get(
+            "tema",
+            "escuro"
+        )
+
+        cfg["tema"] = self.v_tema.get()
+
         cfg["som"]          = self.v_som.get()
         cfg["opacidade"]    = round(self.v_op.get(), 2)
 
@@ -2196,6 +2257,11 @@ class SettingsWindow:
 
         save_cfg(cfg)
 
+        tema_mudou = (
+            tema_anterior
+            != cfg["tema"]
+        )
+
         # Ativa ou desativa a inicializacao
         # automatica junto com o Windows.
         startup_ok = _set_startup_enabled(
@@ -2214,7 +2280,26 @@ class SettingsWindow:
             self.comp.root.attributes("-alpha", cfg["opacidade"])
         except Exception:
             pass
-        self.comp.say("Configuracoes salvas!", "talking", 2500)
+        if tema_mudou:
+            self.win.destroy()
+
+            # Reinicia o processo atual para que todas
+            # as janelas carreguem a nova paleta.
+            os.execl(
+                sys.executable,
+                sys.executable,
+                "-m",
+                "marvin.main",
+            )
+
+            return
+
+        self.comp.say(
+            "Configuracoes salvas!",
+            "talking",
+            2500
+        )
+
         self.win.destroy()
 
     def _limpar(self):
@@ -2362,13 +2447,25 @@ class InteractionPanel:
                   font=("Consolas", 8), pady=10, padx=12,
                   justify="center", wraplength=200).pack()
         tk.Frame(p, bg=C["border"], height=1).pack(fill="x", padx=8)
+
+        self._btn(
+            p,
+            "Central do MARVIN",
+            lambda: [
+                self._close(),
+                self.comp._open_home()
+            ]
+        )
+
         if n:
             self._btn(p, "Ver tarefas",
                        lambda: [self._close(),
                                  TaskWindow(self.root, self.comp)])
+
         self._btn(p, "+ Nova tarefa",
                    lambda: [self._close(),
                              NewTaskWindow(self.root, self.comp)])
+
         self._btn(p, "Agora nao", self._close, fg=C["dim"])
 
     def _build_alert(self, p):
@@ -2794,37 +2891,34 @@ class MarvinCompanion:
                             activeforeground=C["text"],
                             font=("Consolas", 9), bd=0)
         self.ctx.add_command(
-            label="+ Nova Tarefa  [Ctrl+Shift+N]",
-            command=lambda: NewTaskWindow(self.root, self))          # indice 0
+            label="Central do MARVIN",
+            command=self._open_home)                                 # indice 0
+
         self.ctx.add_command(
-            label="Ver Tarefas",
-            command=lambda: TaskWindow(self.root, self))             # indice 1
+            label="+ Nova Tarefa  [Ctrl+Shift+N]",
+            command=lambda: NewTaskWindow(self.root, self))          # indice 1
+
         self.ctx.add_separator()                                     # indice 2
+
         self.ctx.add_command(
             label=self._np_label(),
             command=self._toggle_np)                                 # indice 3
 
-        self.ctx.add_separator()                                     # indice 4
-
-        self.ctx.add_command(
-            label="Resumo do dia",
-            command=self._resumo_do_dia)                             # indice 5
-
         self.ctx.add_command(
             label="Configuracoes",
-            command=lambda: SettingsWindow(self.root, self))         # indice 6
+            command=lambda: SettingsWindow(self.root, self))         # indice 4
+
+        self.ctx.add_separator()                                     # indice 5
+
+        self.ctx.add_command(
+            label="Ocultar MARVIN",
+            command=self._hide_marvin)                               # indice 6
 
         self.ctx.add_separator()                                     # indice 7
 
         self.ctx.add_command(
-            label="Ocultar MARVIN",
-            command=self._hide_marvin)                               # indice 8
-
-        self.ctx.add_separator()                                     # indice 9
-
-        self.ctx.add_command(
             label="Sair",
-            command=self._on_close)                                  # indice 10
+            command=self._on_close)                                  # indice 8
 
         self._start_tray()
 
@@ -2977,18 +3071,10 @@ class MarvinCompanion:
             ),
 
             pystray.MenuItem(
-                "Ver tarefas",
+                "Central do MARVIN",
                 lambda icon, item:
                     self._tray_dispatch(
-                        self._tray_tasks
-                    )
-            ),
-
-            pystray.MenuItem(
-                "Resumo do dia",
-                lambda icon, item:
-                    self._tray_dispatch(
-                        self._tray_summary
+                        self._open_home
                     )
             ),
 
@@ -3003,8 +3089,6 @@ class MarvinCompanion:
                 checked=lambda item:
                     self._compact_enabled
             ),
-
-            pystray.Menu.SEPARATOR,
 
             pystray.MenuItem(
                 "Configuracoes",
@@ -3075,6 +3159,24 @@ class MarvinCompanion:
             pass
 
 
+    def _open_home(self):
+        self._show_marvin()
+
+        abrir_home(
+            self.root,
+            self,
+            abrir_tarefas=lambda:
+                TaskWindow(self.root, self),
+            nova_tarefa=lambda:
+                NewTaskWindow(self.root, self),
+            abrir_checklist=lambda:
+                abrir_checklist(self.root),
+            abrir_resumo=self._resumo_do_dia,
+            abrir_config=lambda:
+                SettingsWindow(self.root, self),
+        )
+
+
     def _tray_new_task(self):
         self._show_marvin()
 
@@ -3090,6 +3192,14 @@ class MarvinCompanion:
         TaskWindow(
             self.root,
             self
+        )
+
+
+    def _tray_checklist(self):
+        self._show_marvin()
+
+        abrir_checklist(
+            self.root
         )
 
 

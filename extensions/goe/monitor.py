@@ -3,6 +3,8 @@ import datetime
 import os
 from pathlib import Path
 
+from .history import registrar_leitura
+
 
 def caminho_csv_goe():
     personalizado = os.getenv(
@@ -191,6 +193,89 @@ class GOEMonitor:
             return
 
         try:
+            # -------------------------------------------------
+            # MODO DE TESTE
+            # Permite simular o GOE sem alterar o CSV real.
+            # -------------------------------------------------
+            arquivo_teste = (
+                Path(__file__).resolve().parent
+                / ".goe_test_command"
+            )
+
+            if arquivo_teste.exists():
+                comando = (
+                    arquivo_teste
+                    .read_text(encoding="utf-8-sig")
+                    .strip()
+                    .lower()
+                )
+
+                try:
+                    arquivo_teste.unlink()
+                except Exception:
+                    pass
+
+                agora = datetime.datetime.now()
+
+                referencia = (
+                    agora.replace(
+                        minute=0,
+                        second=0,
+                        microsecond=0
+                    )
+                    - datetime.timedelta(hours=1)
+                )
+
+                status_teste = {
+                    "ok": True,
+                    "data": referencia.date(),
+                    "hora": referencia.hour,
+                    "atual": True,
+                    "arquivo": "MODO_TESTE",
+                }
+
+                if comando == "parado":
+                    status_teste["qtde"] = 0
+
+                    print(
+                        f"[GOE TESTE] "
+                        f"{referencia.hour:02d}h -> PARADO"
+                    )
+
+                    self._em_alerta = True
+                    self.on_parou(status_teste)
+
+                elif comando == "normal":
+                    status_teste["qtde"] = 123456
+
+                    print(
+                        f"[GOE TESTE] "
+                        f"{referencia.hour:02d}h -> VOLTOU"
+                    )
+
+                    self._em_alerta = False
+                    self.on_voltou(status_teste)
+
+                elif comando == "ok":
+                    status_teste["qtde"] = 123456
+
+                    print(
+                        f"[GOE TESTE] "
+                        f"{referencia.hour:02d}h -> OK"
+                    )
+
+                    if self.on_ok is not None:
+                        self.on_ok(status_teste)
+
+                else:
+                    print(
+                        f"[GOE TESTE] "
+                        f"comando desconhecido: {comando}"
+                    )
+
+                self._agendar()
+                return
+
             if not self.arquivo.exists():
                 self._agendar()
                 return
@@ -222,12 +307,29 @@ class GOEMonitor:
                 self._agendar()
                 return
 
-            # Nao usa resultado antigo para gerar alerta.
+            # -------------------------------------------------
+            # HISTORICO
+            # Uma leitura valida deve ser preservada mesmo
+            # quando ja nao e mais a ultima hora completa.
+            # -------------------------------------------------
+            try:
+                registrar_leitura(
+                    status,
+                    exigir_atual=False,
+                )
+
+            except Exception as exc:
+                print(
+                    "[GOE] Erro ao salvar "
+                    f"historico: {exc}"
+                )
+
+            # Resultado antigo pode entrar no historico,
+            # mas nunca deve gerar alerta.
             if not status.get("atual"):
                 print(
-                    "[GOE] CSV ainda nao corresponde "
-                    "a ultima hora completa:",
-                    status.get("hora")
+                    "[GOE] Leitura historica registrada: "
+                    f"{status.get('hora', 0):02d}h"
                 )
 
                 self._agendar()

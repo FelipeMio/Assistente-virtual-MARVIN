@@ -9,6 +9,7 @@ CFG_F = HOME / "config.json"
 
 
 CFG_DEFAULTS = {
+    "tema": "escuro",
     "pos_x": None,
     "pos_y": None,
     "pos_compact_x": None,
