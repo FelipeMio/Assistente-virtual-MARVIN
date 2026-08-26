@@ -1,29 +1,77 @@
-import tkinter as tk
+from pathlib import Path
 
-from marvin.database import db_listar
+import customtkinter as ctk
+from PIL import Image
+
 from marvin.config import load_cfg
-from marvin.theme import get_palette
-from .window_position import position_near
+from marvin.database import db_listar
 from marvin.checklist import listar_hoje
 
+from .window_position import position_near
 
-_THEME = get_palette(
-    load_cfg().get(
-        "tema",
-        "escuro",
-    )
-)
 
-BG = _THEME["win_bg"]
-PANEL = _THEME["panel"]
-BORDER = _THEME["border"]
-TEXT = _THEME["text"]
-DIM = _THEME["dim"]
-ACCENT = _THEME["accent"]
-GREEN = _THEME["green"]
+# ============================================================
+# PALETAS - baseadas no layout aesthetic
+# ============================================================
+
+LIGHT = {
+    "bg": "#F9F8F6",
+    "card": "#FFFFFF",
+    "text": "#2C2C2A",
+    "dim": "#888780",
+    "muted": "#A6A49D",
+    "border": "#E3E1DC",
+
+    "accent": "#46C5CE",
+    "accent_hover": "#C96844",
+
+    "button_hover": "#F1EFE8",
+
+    "tasks_bg": "#EEEDFE",
+    "tasks_fg": "#534AB7",
+
+    "check_bg": "#E1F5EE",
+    "check_fg": "#0F6E56",
+
+    "summary_bg": "#F1EFE8",
+    "summary_fg": "#5F5E5A",
+
+    "ext_bg": "#FAECE7",
+    "ext_fg": "#993C1D",
+}
+
+
+DARK = {
+    "bg": "#1A1915",
+    "card": "#232220",
+    "text": "#EFEDE8",
+    "dim": "#85837D",
+    "muted": "#5F5E5A",
+    "border": "#302F2C",
+
+    "accent": "#D97757",
+    "accent_hover": "#C96844",
+
+    "button_hover": "#2C2B28",
+
+    "tasks_bg": "#26215C",
+    "tasks_fg": "#AFA9EC",
+
+    "check_bg": "#04342C",
+    "check_fg": "#5DCAA5",
+
+    "summary_bg": "#2C2C2A",
+    "summary_fg": "#B4B2A9",
+
+    "ext_bg": "#4A1B0C",
+    "ext_fg": "#F0997B",
+}
 
 
 class HomeWindow:
+
+    WIDTH = 360
+    HEIGHT = 465
 
     def __init__(
         self,
@@ -35,6 +83,7 @@ class HomeWindow:
         abrir_resumo,
         abrir_config,
     ):
+        self.parent = parent
         self.comp = companion
 
         self.abrir_tarefas = abrir_tarefas
@@ -43,13 +92,53 @@ class HomeWindow:
         self.abrir_resumo = abrir_resumo
         self.abrir_config = abrir_config
 
-        self.win = tk.Toplevel(parent)
+        config = load_cfg()
 
-        self.win.title("MARVIN")
-        self.win.geometry("620x470")
-        self.win.minsize(580, 430)
+        self.tema = config.get(
+            "tema",
+            "escuro",
+        )
 
-        self.win.configure(bg=BG)
+        self.colors = (
+            LIGHT
+            if self.tema == "claro"
+            else DARK
+        )
+
+        ctk.set_appearance_mode(
+            "Light"
+            if self.tema == "claro"
+            else "Dark"
+        )
+
+        self.win = ctk.CTkToplevel(
+            parent
+        )
+
+        self.win.title(
+            "MARVIN"
+        )
+
+        self.win.geometry(
+            f"{self.WIDTH}x{self.HEIGHT}"
+        )
+
+        self.win.resizable(
+            False,
+            False,
+        )
+
+        # Remove barra nativa.
+        self.win.overrideredirect(
+            True
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self._drag_x = 0
+        self._drag_y = 0
 
         self._build()
         self.refresh()
@@ -61,344 +150,849 @@ class HomeWindow:
             self.comp.H,
         )
 
-
-    def _build(self):
-        topo = tk.Frame(
-            self.win,
-            bg=BG,
+        self.win.bind(
+            "<FocusIn>",
+            lambda event:
+                self.refresh(),
         )
 
-        topo.pack(
-            fill="x",
-            padx=28,
-            pady=(24, 18),
+        self.win.after(
+            80,
+            self._focus,
         )
 
-        tk.Label(
-            topo,
-            text="MARVIN",
-            bg=BG,
-            fg=TEXT,
-            font=("Segoe UI", 22, "bold"),
-        ).pack(
-            anchor="w"
+
+    # ========================================================
+    # JANELA
+    # ========================================================
+
+    def _focus(self):
+        try:
+            self.win.deiconify()
+            self.win.lift()
+            self.win.focus_force()
+
+        except Exception:
+            pass
+
+
+    def close(self):
+        try:
+            self.comp._home_window = None
+
+        except Exception:
+            pass
+
+        try:
+            self.win.destroy()
+
+        except Exception:
+            pass
+
+
+    def _hide(self):
+        try:
+            self.win.withdraw()
+        except Exception:
+            pass
+
+
+    # ========================================================
+    # ARRASTAR JANELA
+    # ========================================================
+
+    def _drag_start(self, event):
+        self._drag_x = event.x_root - self.win.winfo_x()
+        self._drag_y = event.y_root - self.win.winfo_y()
+
+
+    def _drag_move(self, event):
+        x = event.x_root - self._drag_x
+        y = event.y_root - self._drag_y
+
+        self.win.geometry(
+            f"+{x}+{y}"
         )
 
-        tk.Label(
-            topo,
-            text="O que vamos fazer hoje?",
-            bg=BG,
-            fg=DIM,
-            font=("Segoe UI", 10),
-        ).pack(
-            anchor="w",
-            pady=(2, 0),
+
+    # ========================================================
+    # HELPERS VISUAIS
+    # ========================================================
+
+    def _divider(self, parent):
+        return ctk.CTkFrame(
+            parent,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors["border"],
         )
 
-        self.cards = tk.Frame(
-            self.win,
-            bg=BG,
+
+    def _icon_box(
+        self,
+        parent,
+        text,
+        bg,
+        fg,
+    ):
+        box = ctk.CTkFrame(
+            parent,
+            width=28,
+            height=28,
+            corner_radius=8,
+            fg_color=bg,
         )
 
-        self.cards.pack(
-            fill="both",
-            expand=True,
-            padx=28,
+        box.pack_propagate(
+            False
         )
 
-        self.cards.columnconfigure(
-            0,
-            weight=1,
+        ctk.CTkLabel(
+            box,
+            text=text,
+            text_color=fg,
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=13,
+                weight="bold",
+            ),
+        ).place(
+            relx=0.5,
+            rely=0.5,
+            anchor="center",
         )
 
-        self.cards.columnconfigure(
-            1,
-            weight=1,
-        )
-
-        self.card_tarefas = self._card(
-            0,
-            0,
-            "Tarefas",
-            "Carregando...",
-            "Ver tarefas",
-            self.abrir_tarefas,
-        )
-
-        self.card_checklist = self._card(
-            0,
-            1,
-            "Checklist diário",
-            "Carregando...",
-            "Abrir checklist",
-            self.abrir_checklist,
-        )
-
-        self.card_resumo = self._card(
-            1,
-            0,
-            "Resumo do dia",
-            "Veja o que foi feito e o que ainda falta.",
-            "Ver resumo",
-            self.abrir_resumo,
-        )
-
-        self.card_extensoes = self._card(
-            1,
-            1,
-            "Extensões",
-            "Carregando...",
-            None,
-            None,
-        )
-
-        self.ext_actions = tk.Frame(
-            self.card_extensoes["frame"],
-            bg=PANEL,
-        )
-
-        self.ext_actions.pack(
-            anchor="w",
-            fill="x",
-            padx=18,
-            pady=(0, 16),
-        )
-
-        rodape = tk.Frame(
-            self.win,
-            bg=BG,
-        )
-
-        rodape.pack(
-            fill="x",
-            padx=28,
-            pady=(16, 22),
-        )
-
-        self._button(
-            rodape,
-            "+ Nova tarefa",
-            self.nova_tarefa,
-        ).pack(
-            side="left",
-        )
-
-        self._button(
-            rodape,
-            "Configurações",
-            self.abrir_config,
-        ).pack(
-            side="right",
-        )
+        return box
 
 
     def _card(
         self,
+        parent,
         row,
         column,
-        titulo,
-        descricao,
-        botao,
-        comando,
+        icon,
+        icon_bg,
+        icon_fg,
+        title,
+        button_text,
+        command,
     ):
-        frame = tk.Frame(
-            self.cards,
-            bg=PANEL,
-            highlightbackground=BORDER,
-            highlightthickness=1,
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=self.colors["card"],
+            border_width=1,
+            border_color=self.colors["border"],
+            corner_radius=12,
         )
 
-        frame.grid(
+        card.grid(
             row=row,
             column=column,
             sticky="nsew",
-            padx=6,
-            pady=6,
+            padx=4,
+            pady=4,
         )
 
-        frame.columnconfigure(
-            0,
-            weight=1,
+        icon_box = self._icon_box(
+            card,
+            icon,
+            icon_bg,
+            icon_fg,
         )
 
-        tk.Label(
-            frame,
-            text=titulo,
-            bg=PANEL,
-            fg=TEXT,
-            font=("Segoe UI", 12, "bold"),
-        ).pack(
+        icon_box.pack(
             anchor="w",
-            padx=18,
-            pady=(16, 5),
+            padx=13,
+            pady=(13, 7),
         )
 
-        label_desc = tk.Label(
-            frame,
-            text=descricao,
-            bg=PANEL,
-            fg=DIM,
-            font=("Segoe UI", 9),
+        title_label = ctk.CTkLabel(
+            card,
+            text=title,
+            text_color=self.colors["text"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=12,
+                weight="bold",
+            ),
+        )
+
+        title_label.pack(
+            fill="x",
+            padx=13,
+        )
+
+        description = ctk.CTkLabel(
+            card,
+            text="",
+            text_color=self.colors["dim"],
+            anchor="w",
             justify="left",
-            wraplength=230,
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+            ),
         )
 
-        label_desc.pack(
+        description.pack(
+            fill="x",
+            padx=13,
+            pady=(2, 7),
+        )
+
+        button = ctk.CTkButton(
+            card,
+            text=button_text,
+            width=94,
+            height=27,
+            corner_radius=6,
+
+            fg_color="transparent",
+            hover_color=self.colors["button_hover"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+
+            command=command,
+        )
+
+        button.pack(
             anchor="w",
-            padx=18,
+            padx=13,
             pady=(0, 12),
         )
 
-        if botao and comando:
-            self._button(
-                frame,
-                botao,
-                comando,
-            ).pack(
-                anchor="w",
-                padx=18,
-                pady=(0, 16),
-            )
-
         return {
-            "frame": frame,
-            "descricao": label_desc,
+            "frame": card,
+            "description": description,
+            "button": button,
         }
 
 
-    def _button(
-        self,
-        parent,
-        texto,
-        comando,
-    ):
-        return tk.Button(
-            parent,
-            text=texto,
-            command=comando,
-            bg=BORDER,
-            fg=TEXT,
-            activebackground=ACCENT,
-            activeforeground="#ffffff",
-            relief="flat",
-            bd=0,
-            padx=14,
-            pady=7,
-            cursor="hand2",
-            font=("Segoe UI", 9),
+    # ========================================================
+    # INTERFACE
+    # ========================================================
+
+    def _build(self):
+
+        shell = ctk.CTkFrame(
+            self.win,
+            fg_color=self.colors["bg"],
+            border_width=1,
+            border_color=self.colors["border"],
+            corner_radius=16,
+        )
+
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=1,
+            pady=1,
         )
 
 
+        # ====================================================
+        # TITLEBAR
+        # ====================================================
+
+        titlebar = ctk.CTkFrame(
+            shell,
+            height=45,
+            fg_color="transparent",
+            corner_radius=0,
+        )
+
+        titlebar.pack(
+            fill="x",
+        )
+
+        titlebar.pack_propagate(
+            False
+        )
+
+        titlebar.bind(
+            "<ButtonPress-1>",
+            self._drag_start,
+        )
+
+        titlebar.bind(
+            "<B1-Motion>",
+            self._drag_move,
+        )
+
+
+        left = ctk.CTkFrame(
+            titlebar,
+            fg_color="transparent",
+        )
+
+        left.pack(
+            side="left",
+            padx=14,
+        )
+
+
+        mark = ctk.CTkFrame(
+            left,
+            width=21,
+            height=21,
+            corner_radius=6,
+            fg_color=self.colors["accent"],
+        )
+
+        mark.pack(
+            side="left",
+        )
+
+        mark.pack_propagate(
+            False
+        )
+
+        ctk.CTkLabel(
+            mark,
+            text="✦",
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(
+                size=10,
+                weight="bold",
+            ),
+        ).place(
+            relx=0.5,
+            rely=0.5,
+            anchor="center",
+        )
+
+
+        ctk.CTkLabel(
+            left,
+            text="MARVIN",
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+        ).pack(
+            side="left",
+            padx=(8, 0),
+        )
+
+
+        close_button = ctk.CTkButton(
+            titlebar,
+            text="×",
+            width=28,
+            height=28,
+            corner_radius=7,
+
+            fg_color="transparent",
+            hover_color=self.colors["button_hover"],
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=17,
+                weight="bold",
+            ),
+
+            border_width=0,
+            command=self.close,
+        )
+
+        close_button.pack(
+            side="right",
+            padx=(2, 10),
+        )
+
+
+        settings_button = ctk.CTkButton(
+            titlebar,
+            text="⚙",
+            width=27,
+            height=27,
+            corner_radius=7,
+
+            fg_color="transparent",
+            hover_color=self.colors["button_hover"],
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=13,
+            ),
+
+            border_width=0,
+            command=self.abrir_config,
+        )
+
+        settings_button.pack(
+            side="right",
+            padx=2,
+        )
+
+
+        self._divider(
+            shell
+        ).pack(
+            fill="x",
+        )
+
+
+        # ====================================================
+        # HEADER
+        # ====================================================
+
+        header = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+            height=72,
+        )
+
+        header.pack(
+            fill="x",
+            padx=17,
+            pady=(13, 10),
+        )
+
+        header.pack_propagate(
+            False
+        )
+
+
+        # Cabeça do MARVIN
+        icon_path = (
+            Path(__file__)
+            .resolve()
+            .parent
+            .parent
+            .parent
+            / "assets"
+            / "marvin"
+            / "marvin_head.png"
+        )
+
+        try:
+            self.marvin_head_image = ctk.CTkImage(
+                light_image=Image.open(
+                    icon_path
+                ),
+                dark_image=Image.open(
+                    icon_path
+                ),
+                size=(45, 45),
+            )
+
+            avatar = ctk.CTkLabel(
+                header,
+                text="",
+                image=self.marvin_head_image,
+                width=45,
+                height=45,
+            )
+
+        except Exception:
+            avatar = ctk.CTkLabel(
+                header,
+                text="M",
+                width=40,
+                height=40,
+                corner_radius=10,
+                fg_color=self.colors["tasks_bg"],
+                text_color=self.colors["tasks_fg"],
+            )
+
+        avatar.pack(
+            side="left",
+        )
+
+
+        greeting = ctk.CTkFrame(
+            header,
+            fg_color="transparent",
+        )
+
+        greeting.pack(
+            side="left",
+            padx=(10, 0),
+        )
+
+
+        ctk.CTkLabel(
+            greeting,
+            text="Marvin",
+            text_color=self.colors["text"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=14,
+                weight="bold",
+            ),
+        ).pack(
+            anchor="w",
+        )
+
+
+        ctk.CTkLabel(
+            greeting,
+            text="O que vamos fazer hoje?",
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+        ).pack(
+            anchor="w",
+        )
+
+
+        self._divider(
+            shell
+        ).pack(
+            fill="x",
+        )
+
+
+        # ====================================================
+        # GRID
+        # ====================================================
+
+        grid = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        grid.pack(
+            fill="both",
+            expand=True,
+            padx=8,
+            pady=8,
+        )
+
+        grid.grid_columnconfigure(
+            (0, 1),
+            weight=1,
+            uniform="cards",
+        )
+
+        grid.grid_rowconfigure(
+            (0, 1),
+            weight=1,
+            uniform="cards",
+        )
+
+
+        self.card_tasks = self._card(
+            grid,
+            0,
+            0,
+            "✓",
+            self.colors["tasks_bg"],
+            self.colors["tasks_fg"],
+            "Tarefas",
+            "Ver tarefas",
+            self.abrir_tarefas,
+        )
+
+
+        self.card_checklist = self._card(
+            grid,
+            0,
+            1,
+            "☷",
+            self.colors["check_bg"],
+            self.colors["check_fg"],
+            "Checklist diário",
+            "Abrir checklist",
+            self.abrir_checklist,
+        )
+
+
+        self.card_summary = self._card(
+            grid,
+            1,
+            0,
+            "▥",
+            self.colors["summary_bg"],
+            self.colors["summary_fg"],
+            "Resumo do dia",
+            "Ver resumo",
+            self.abrir_resumo,
+        )
+
+
+        # Extensões recebe tratamento diferente.
+        self.card_extensions = self._card(
+            grid,
+            1,
+            1,
+            "✦",
+            self.colors["ext_bg"],
+            self.colors["ext_fg"],
+            "Extensões",
+            "",
+            lambda: None,
+        )
+
+        self.card_extensions[
+            "button"
+        ].pack_forget()
+
+
+        self.extension_buttons = ctk.CTkFrame(
+            self.card_extensions["frame"],
+            fg_color="transparent",
+        )
+
+        self.extension_buttons.pack(
+            fill="x",
+            padx=13,
+            pady=(0, 12),
+        )
+
+
+        # ====================================================
+        # FOOTER
+        # ====================================================
+
+        self._divider(
+            shell
+        ).pack(
+            fill="x",
+        )
+
+
+        footer = ctk.CTkFrame(
+            shell,
+            height=54,
+            fg_color="transparent",
+        )
+
+        footer.pack(
+            fill="x",
+            padx=11,
+            pady=9,
+        )
+
+        footer.pack_propagate(
+            False
+        )
+
+
+        ctk.CTkButton(
+            footer,
+            text="+ Nova tarefa",
+            height=36,
+            corner_radius=8,
+
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"],
+
+            text_color="#FFFFFF",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+
+            command=self.nova_tarefa,
+        ).pack(
+            side="left",
+            fill="x",
+            expand=True,
+        )
+
+
+
+
+    # ========================================================
+    # DADOS
+    # ========================================================
+
     def refresh(self):
+
+        # ----------------------------------------------------
+        # Tarefas
+        # ----------------------------------------------------
+
         try:
             pendentes = db_listar(
                 apenas_pendentes=True
             )
 
-            total_pendentes = len(
+            total = len(
                 pendentes
             )
 
         except Exception:
-            total_pendentes = 0
+            total = 0
 
-        self.card_tarefas[
-            "descricao"
-        ].config(
+
+        self.card_tasks[
+            "description"
+        ].configure(
             text=(
-                f"{total_pendentes} tarefa(s) "
-                "pendente(s)."
+                f"{total} pendente"
+                if total == 1
+                else f"{total} pendentes"
             )
         )
+
+
+        # ----------------------------------------------------
+        # CHECKLIST
+        # ----------------------------------------------------
 
         try:
             itens = listar_hoje()
 
-            total = len(itens)
-
-            feitos = sum(
-                1
-                for item in itens
-                if item["concluido"]
+            total_itens = len(
+                itens
             )
 
+            concluidos = 0
+
+            for item in itens:
+
+                if isinstance(
+                    item,
+                    dict
+                ):
+                    if item.get(
+                        "concluido"
+                    ):
+                        concluidos += 1
+
+                elif (
+                    isinstance(
+                        item,
+                        (list, tuple)
+                    )
+                    and item
+                    and item[-1]
+                ):
+                    concluidos += 1
+
         except Exception:
-            total = 0
-            feitos = 0
+            total_itens = 0
+            concluidos = 0
+
 
         self.card_checklist[
-            "descricao"
-        ].config(
+            "description"
+        ].configure(
             text=(
-                f"{feitos} de {total} "
-                "item(ns) concluído(s) hoje."
+                f"{concluidos} de "
+                f"{total_itens} concluído"
             )
         )
 
-        try:
-            quantidade_extensoes = len(
-                getattr(
-                    self.comp,
-                    "_extensions",
-                    [],
-                )
-            )
 
-        except Exception:
-            quantidade_extensoes = 0
+        # ----------------------------------------------------
+        # RESUMO
+        # ----------------------------------------------------
 
-        if quantidade_extensoes == 0:
-            texto_ext = (
-                "Nenhuma extensão ativa."
-            )
-
-        elif quantidade_extensoes == 1:
-            texto_ext = (
-                "1 extensão ativa."
-            )
-
-        else:
-            texto_ext = (
-                f"{quantidade_extensoes} "
-                "extensões ativas."
-            )
-
-        self.card_extensoes[
-            "descricao"
-        ].config(
-            text=texto_ext
+        self.card_summary[
+            "description"
+        ].configure(
+            text="O feito e o que falta"
         )
+
+
+        # ----------------------------------------------------
+        # EXTENSOES
+        # ----------------------------------------------------
+
+        quantidade = len(
+            getattr(
+                self.comp,
+                "_extensions",
+                [],
+            )
+        )
+
+
+        self.card_extensions[
+            "description"
+        ].configure(
+            text=(
+                "1 ativa"
+                if quantidade == 1
+                else f"{quantidade} ativas"
+            )
+        )
+
 
         for widget in (
-            self.ext_actions.winfo_children()
+            self.extension_buttons
+            .winfo_children()
         ):
             widget.destroy()
 
-        acoes = getattr(
+
+        actions = getattr(
             self.comp,
             "_extension_actions",
             {},
         )
 
-        if isinstance(
-            acoes,
-            dict,
+        if not isinstance(
+            actions,
+            dict
         ):
-            for nome, comando in (
-                acoes.items()
+            return
+
+
+        for nome, comando in actions.items():
+
+            if not callable(
+                comando
             ):
-                if not callable(comando):
-                    continue
+                continue
 
-                self._button(
-                    self.ext_actions,
-                    nome,
-                    comando,
-                ).pack(
-                    anchor="w",
-                    pady=2,
-                )
 
+            ctk.CTkButton(
+                self.extension_buttons,
+
+                text=nome,
+
+                height=24,
+
+                corner_radius=5,
+
+                fg_color=self.colors["ext_bg"],
+                hover_color=self.colors["accent"],
+
+                text_color=self.colors["ext_fg"],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                    weight="bold",
+                ),
+
+                command=comando,
+
+            ).pack(
+                anchor="w",
+            )
+
+
+# ============================================================
+# ABRIR CENTRAL
+# ============================================================
 
 def abrir_home(
     parent,
@@ -409,7 +1003,29 @@ def abrir_home(
     abrir_resumo,
     abrir_config,
 ):
-    return HomeWindow(
+
+    existente = getattr(
+        companion,
+        "_home_window",
+        None,
+    )
+
+
+    if (
+        existente is not None
+        and existente.win.winfo_exists()
+    ):
+        existente.win.deiconify()
+
+        existente.refresh()
+
+        existente.win.lift()
+        existente.win.focus_force()
+
+        return existente
+
+
+    janela = HomeWindow(
         parent,
         companion,
         abrir_tarefas,
@@ -418,3 +1034,8 @@ def abrir_home(
         abrir_resumo,
         abrir_config,
     )
+
+
+    companion._home_window = janela
+
+    return janela

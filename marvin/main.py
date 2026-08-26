@@ -1,4 +1,5 @@
 import tkinter as tk
+import customtkinter as ctk
 import threading, math, time, datetime, random, sys, textwrap, os, queue
 from tkinter import messagebox
 from pathlib import Path
@@ -624,7 +625,7 @@ def _position_near_marvin(win, companion):
 
             monitor = user32.MonitorFromWindow(
                 root.winfo_id(),
-                2  # MONITOR_DEFAULTTONEAREST
+                2
             )
 
             info = MONITORINFO()
@@ -656,7 +657,10 @@ def _position_near_marvin(win, companion):
     else:
         px = max(
             mon_left,
-            min(rx + rw + gap, mon_right - ww)
+            min(
+                rx + rw + gap,
+                mon_right - ww
+            )
         )
 
     # Centraliza verticalmente em relacao ao MARVIN
@@ -664,11 +668,15 @@ def _position_near_marvin(win, companion):
 
     py = max(
         mon_top,
-        min(py, mon_bottom - wh)
+        min(
+            py,
+            mon_bottom - wh
+        )
     )
 
-    win.geometry(f"+{px}+{py}")
-
+    win.geometry(
+        f"+{px}+{py}"
+    )
 
 def _header(win, title):
     hf = tk.Frame(win, bg=C["panel"], height=42)
@@ -842,242 +850,1107 @@ def _bind_auto_time(entry, var):
 #  JANELA: NOVA TAREFA
 
 class NewTaskWindow:
-    def __init__(self, parent, companion, prefill=""):
+
+    WIDTH = 390
+    HEIGHT = 590
+
+    def __init__(
+        self,
+        parent,
+        companion,
+        prefill="",
+    ):
         self.comp = companion
-        self.win  = _make_win(parent, "Nova Tarefa", 400, 430)
-        self.win.grab_set()
-        self._build(prefill)
-        self._position_near_marvin()
+        self.parent = parent
 
-    def _position_near_marvin(self):
-        root = self.comp.root
-
-        self.win.update_idletasks()
-
-        ww = self.win.winfo_width()
-        wh = self.win.winfo_height()
-
-        rx = root.winfo_x()
-        ry = root.winfo_y()
-        rw = self.comp.W
-        rh = self.comp.H
-
-        # Fallback: monitor principal
-        mon_left = 0
-        mon_top = 0
-        mon_right = root.winfo_screenwidth()
-        mon_bottom = root.winfo_screenheight()
-
-        # Descobre o monitor em que o MARVIN esta
-        if sys.platform == "win32":
-            try:
-                import ctypes
-                from ctypes import wintypes
-
-                class MONITORINFO(ctypes.Structure):
-                    _fields_ = [
-                        ("cbSize", wintypes.DWORD),
-                        ("rcMonitor", wintypes.RECT),
-                        ("rcWork", wintypes.RECT),
-                        ("dwFlags", wintypes.DWORD),
-                    ]
-
-                user32 = ctypes.windll.user32
-
-                monitor = user32.MonitorFromWindow(
-                    root.winfo_id(),
-                    2  # MONITOR_DEFAULTTONEAREST
-                )
-
-                info = MONITORINFO()
-                info.cbSize = ctypes.sizeof(MONITORINFO)
-
-                if user32.GetMonitorInfoW(
-                    monitor,
-                    ctypes.byref(info)
-                ):
-                    mon_left = info.rcWork.left
-                    mon_top = info.rcWork.top
-                    mon_right = info.rcWork.right
-                    mon_bottom = info.rcWork.bottom
-
-            except Exception:
-                pass
-
-        gap = 12
-
-        # Tenta abrir primeiro do lado esquerdo do MARVIN
-        if rx - ww - gap >= mon_left:
-            px = rx - ww - gap
-
-        # Se nao couber, abre do lado direito
-        elif rx + rw + gap + ww <= mon_right:
-            px = rx + rw + gap
-
-        # Ultimo recurso: mantem dentro do monitor
-        else:
-            px = max(
-                mon_left,
-                min(rx - ww - gap, mon_right - ww)
-            )
-
-        # Centraliza verticalmente em relacao ao MARVIN
-        py = ry + (rh - wh) // 2
-
-        # Mantem dentro da area util do monitor
-        py = max(
-            mon_top,
-            min(py, mon_bottom - wh)
+        self.tema = cfg.get(
+            "tema",
+            "escuro",
         )
 
-        self.win.geometry(f"+{px}+{py}")
+        if self.tema == "claro":
+            self.colors = {
+                "bg": "#F9F8F6",
+                "card": "#FFFFFF",
+                "text": "#2C2C2A",
+                "dim": "#888780",
+                "border": "#E3E1DC",
 
-    def _build(self, prefill):
-        w = self.win
-        _header(w, "Nova Tarefa")
-        body = tk.Frame(w, bg=C["win_bg"])
-        body.pack(fill="both", expand=True, padx=20, pady=8)
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
 
-        _lbl(body, "Titulo da tarefa *")
-        self.v_txt = tk.StringVar(value=prefill)
-        self.e_txt = _entry(body, self.v_txt)
+                "input": "#FFFFFF",
+                "input_hover": "#F6F4EF",
 
-        _lbl(body, "Descricao (opcional)")
-        self.v_desc = tk.StringVar()
-        _entry(body, self.v_desc)
+                "high_bg": "#FAE7E5",
+                "high_fg": "#A33A32",
 
-        row = tk.Frame(body, bg=C["win_bg"])
-        row.pack(fill="x", pady=(4, 0))
-        Lf = tk.Frame(row, bg=C["win_bg"])
-        Lf.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        Rf = tk.Frame(row, bg=C["win_bg"])
-        Rf.pack(side="left")
+                "normal_bg": "#FFF0D9",
+                "normal_fg": "#9A6424",
 
-        tk.Label(Lf, text="Data (DD/MM/AAAA) *",
-                  bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
+                "low_bg": "#E7F3EA",
+                "low_fg": "#39734A",
+
+                "none_bg": "#F1EFE8",
+                "none_fg": "#6F6D67",
+
+                "error": "#C54B45",
+            }
+
+        else:
+            self.colors = {
+                "bg": "#1A1915",
+                "card": "#232220",
+                "text": "#EFEDE8",
+                "dim": "#85837D",
+                "border": "#34332F",
+
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
+
+                "input": "#232220",
+                "input_hover": "#2C2B28",
+
+                "high_bg": "#482522",
+                "high_fg": "#F19A91",
+
+                "normal_bg": "#49351F",
+                "normal_fg": "#E8B86D",
+
+                "low_bg": "#20382A",
+                "low_fg": "#83C995",
+
+                "none_bg": "#2C2C2A",
+                "none_fg": "#B4B2A9",
+
+                "error": "#F08078",
+            }
+
+        ctk.set_appearance_mode(
+            "Light"
+            if self.tema == "claro"
+            else "Dark"
+        )
+
+        self.win = ctk.CTkToplevel(
+            parent
+        )
+
+        self.win.geometry(
+            f"{self.WIDTH}x{self.HEIGHT}"
+        )
+
+        self.win.resizable(
+            False,
+            False,
+        )
+
+        self.win.overrideredirect(
+            True
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self.win.grab_set()
+
+        self._drag_x = 0
+        self._drag_y = 0
+
+        self._build(
+            prefill
+        )
+
+        _position_near_marvin(
+            self.win,
+            self.comp
+        )
+
+        self.win.bind(
+            "<Escape>",
+            lambda e:
+                self._close()
+        )
+
+        self.win.after(
+            80,
+            self._focus_title
+        )
+
+
+    # ========================================================
+    # JANELA
+    # ========================================================
+
+    def _close(self):
+        try:
+            self.win.grab_release()
+        except Exception:
+            pass
+
+        try:
+            self.win.destroy()
+        except Exception:
+            pass
+
+
+    def _focus_title(self):
+        try:
+            self.e_txt.focus()
+        except Exception:
+            pass
+
+
+    def _drag_start(
+        self,
+        event,
+    ):
+        self._drag_x = (
+            event.x_root
+            - self.win.winfo_x()
+        )
+
+        self._drag_y = (
+            event.y_root
+            - self.win.winfo_y()
+        )
+
+
+    def _drag_move(
+        self,
+        event,
+    ):
+        x = (
+            event.x_root
+            - self._drag_x
+        )
+
+        y = (
+            event.y_root
+            - self._drag_y
+        )
+
+        self.win.geometry(
+            f"+{x}+{y}"
+        )
+
+
+    # ========================================================
+    # HELPERS
+    # ========================================================
+
+    def _label(
+        self,
+        parent,
+        text,
+        required=False,
+    ):
+        texto = text
+
+        if required:
+            texto += " *"
+
+        label = ctk.CTkLabel(
+            parent,
+            text=texto.upper(),
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+        )
+
+        label.pack(
+            fill="x",
+            pady=(0, 5),
+        )
+
+        return label
+
+
+    def _entry(
+        self,
+        parent,
+        variable,
+        placeholder="",
+    ):
+        entry = ctk.CTkEntry(
+            parent,
+            textvariable=variable,
+
+            height=36,
+
+            corner_radius=7,
+
+            fg_color=self.colors["input"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            placeholder_text=placeholder,
+            placeholder_text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+        )
+
+        entry.pack(
+            fill="x",
+        )
+
+        return entry
+
+
+    def _divider(
+        self,
+        parent,
+    ):
+        ctk.CTkFrame(
+            parent,
+            height=1,
+            fg_color=self.colors["border"],
+            corner_radius=0,
+        ).pack(
+            fill="x",
+        )
+
+
+    # ========================================================
+    # INTERFACE
+    # ========================================================
+
+    def _build(
+        self,
+        prefill,
+    ):
+        shell = ctk.CTkFrame(
+            self.win,
+
+            fg_color=self.colors["bg"],
+
+            corner_radius=14,
+
+            border_width=1,
+            border_color=self.colors["border"],
+        )
+
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=1,
+            pady=1,
+        )
+
+
+        # ====================================================
+        # TITLEBAR
+        # ====================================================
+
+        titlebar = ctk.CTkFrame(
+            shell,
+            height=44,
+            fg_color="transparent",
+        )
+
+        titlebar.pack(
+            fill="x",
+        )
+
+        titlebar.pack_propagate(
+            False
+        )
+
+        titlebar.bind(
+            "<ButtonPress-1>",
+            self._drag_start,
+        )
+
+        titlebar.bind(
+            "<B1-Motion>",
+            self._drag_move,
+        )
+
+
+        marca = ctk.CTkFrame(
+            titlebar,
+            width=21,
+            height=21,
+            corner_radius=6,
+            fg_color=self.colors["accent"],
+        )
+
+        marca.pack(
+            side="left",
+            padx=(14, 0),
+        )
+
+        marca.pack_propagate(
+            False
+        )
+
+        ctk.CTkLabel(
+            marca,
+            text="✦",
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(
+                size=9,
+                weight="bold",
+            ),
+        ).place(
+            relx=0.5,
+            rely=0.5,
+            anchor="center",
+        )
+
+
+        ctk.CTkLabel(
+            titlebar,
+            text="NOVA TAREFA",
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+        ).pack(
+            side="left",
+            padx=(8, 0),
+        )
+
+
+        ctk.CTkButton(
+            titlebar,
+
+            text="×",
+
+            width=28,
+            height=28,
+
+            corner_radius=7,
+
+            fg_color="transparent",
+            hover_color=self.colors["input_hover"],
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=17,
+                weight="bold",
+            ),
+
+            command=self._close,
+
+        ).pack(
+            side="right",
+            padx=10,
+        )
+
+
+        self._divider(
+            shell
+        )
+
+
+        # ====================================================
+        # BODY
+        # ====================================================
+
+        body = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        body.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=(16, 12),
+        )
+
+
+        ctk.CTkLabel(
+            body,
+
+            text="Nova tarefa",
+
+            text_color=self.colors["text"],
+
+            anchor="w",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=17,
+                weight="bold",
+            ),
+
+        ).pack(
+            fill="x",
+            pady=(0, 15),
+        )
+
+
+        # ====================================================
+        # TITULO
+        # ====================================================
+
+        self._label(
+            body,
+            "Título",
+            True,
+        )
+
+        self.v_txt = tk.StringVar(
+            value=prefill
+        )
+
+        self.e_txt = self._entry(
+            body,
+            self.v_txt,
+            "Nome da tarefa",
+        )
+
+
+        # ====================================================
+        # DESCRICAO
+        # ====================================================
+
+        desc_wrap = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        desc_wrap.pack(
+            fill="x",
+            pady=(13, 0),
+        )
+
+
+        self._label(
+            desc_wrap,
+            "Descrição",
+        )
+
+
+        self.desc_box = ctk.CTkTextbox(
+            desc_wrap,
+
+            height=76,
+
+            corner_radius=7,
+
+            fg_color=self.colors["input"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+
+            wrap="word",
+        )
+
+        self.desc_box.pack(
+            fill="x",
+        )
+
+
+        # ====================================================
+        # DATA / HORA
+        # ====================================================
+
+        date_row = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        date_row.pack(
+            fill="x",
+            pady=(13, 0),
+        )
+
+        date_row.grid_columnconfigure(
+            0,
+            weight=1,
+        )
+
+        date_row.grid_columnconfigure(
+            1,
+            weight=1,
+        )
+
+
+        data_frame = ctk.CTkFrame(
+            date_row,
+            fg_color="transparent",
+        )
+
+        data_frame.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=(0, 5),
+        )
+
+
+        hora_frame = ctk.CTkFrame(
+            date_row,
+            fg_color="transparent",
+        )
+
+        hora_frame.grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(5, 0),
+        )
+
+
+        self._label(
+            data_frame,
+            "Data",
+            True,
+        )
+
+        self._label(
+            hora_frame,
+            "Horário",
+            True,
+        )
+
+
         proximo_minuto = (
             datetime.datetime.now()
-            .replace(second=0, microsecond=0)
-            + datetime.timedelta(minutes=1)
+            .replace(
+                second=0,
+                microsecond=0,
+            )
+            + datetime.timedelta(
+                minutes=1
+            )
         )
 
+
         self.v_data = tk.StringVar(
-            value=proximo_minuto.strftime("%d/%m/%Y"))
-        self.e_data = tk.Entry(Lf, textvariable=self.v_data,
-                                bg=C["panel"], fg=C["text"],
-                                insertbackground=C["accent"],
-                                font=("Consolas", 9), bd=0, relief="flat",
-                                width=13)
-        self.e_data.pack(fill="x", ipady=6)
+            value=(
+                proximo_minuto
+                .strftime(
+                    "%d/%m/%Y"
+                )
+            )
+        )
 
-        tk.Label(Rf, text="Horario (HH:MM) *",
-                  bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
         self.v_hora = tk.StringVar(
-            value=proximo_minuto.strftime("%H:%M"))
-        self.e_hora = tk.Entry(Rf, textvariable=self.v_hora,
-                                bg=C["panel"], fg=C["text"],
-                                insertbackground=C["accent"],
-                                font=("Consolas", 9), bd=0, relief="flat",
-                                width=7)
-        self.e_hora.pack(ipady=6)
+            value=(
+                proximo_minuto
+                .strftime(
+                    "%H:%M"
+                )
+            )
+        )
 
-        # Digitar 1830 vira automaticamente 18:30.
+
+        self.e_data = self._entry(
+            data_frame,
+            self.v_data,
+        )
+
+        self.e_hora = self._entry(
+            hora_frame,
+            self.v_hora,
+        )
+
+
         _bind_auto_time(
             self.e_hora,
             self.v_hora
         )
 
-        self.v_data.trace_add("write", self._validate_live)
-        self.v_hora.trace_add("write", self._validate_live)
 
-        _lbl(body, "Repeticao")
-        self.v_rep = tk.StringVar(value=REPEAT_OPTS[0])
-        _option_menu(body, self.v_rep)
-
-        _lbl(body, "Prioridade")
-        self.v_prioridade = tk.StringVar(
-            value="Normal"
+        self.v_data.trace_add(
+            "write",
+            self._validate_live
         )
-        _priority_menu(
+
+        self.v_hora.trace_add(
+            "write",
+            self._validate_live
+        )
+
+
+        # ====================================================
+        # REPETICAO
+        # ====================================================
+
+        repeat_wrap = ctk.CTkFrame(
             body,
-            self.v_prioridade
+            fg_color="transparent",
         )
+
+        repeat_wrap.pack(
+            fill="x",
+            pady=(13, 0),
+        )
+
+
+        self._label(
+            repeat_wrap,
+            "Repetição",
+        )
+
+
+        self.v_rep = tk.StringVar(
+            value=REPEAT_OPTS[0]
+        )
+
+
+        self.repeat_combo = ctk.CTkComboBox(
+            repeat_wrap,
+
+            variable=self.v_rep,
+
+            values=list(
+                REPEAT_OPTS
+            ),
+
+            height=36,
+
+            corner_radius=7,
+
+            fg_color=self.colors["input"],
+            button_color=self.colors["input"],
+            button_hover_color=self.colors["input_hover"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            dropdown_fg_color=self.colors["card"],
+            dropdown_hover_color=self.colors["input_hover"],
+            dropdown_text_color=self.colors["text"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+
+            dropdown_font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+
+            state="readonly",
+        )
+
+        self.repeat_combo.pack(
+            fill="x",
+        )
+
+
+        # ====================================================
+        # PRIORIDADE
+        # ====================================================
+
+        priority_wrap = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        priority_wrap.pack(
+            fill="x",
+            pady=(13, 0),
+        )
+
+
+        self._label(
+            priority_wrap,
+            "Prioridade",
+        )
+
+
+        priority_row = ctk.CTkFrame(
+            priority_wrap,
+            fg_color="transparent",
+        )
+
+        priority_row.pack(
+            fill="x",
+        )
+
+        # As tres colunas usam exatamente a mesma largura.
+        for coluna in range(4):
+            priority_row.grid_columnconfigure(
+                coluna,
+                weight=1,
+                uniform="prioridade",
+            )
+
+
+        self.v_prioridade = tk.StringVar(
+            value="Nenhuma"
+        )
+
+        self.priority_buttons = {}
+
+
+        for coluna, (texto, prioridade) in enumerate((
+            ("Alta", "Alta"),
+            ("Média", "Normal"),
+            ("Baixa", "Baixa"),
+            ("Nenhuma", "Nenhuma"),
+        )):
+            button = ctk.CTkButton(
+                priority_row,
+
+                text=texto,
+
+                height=46,
+
+                corner_radius=7,
+
+                fg_color="transparent",
+
+                hover_color=self.colors["input_hover"],
+
+                border_width=1,
+                border_color=self.colors["border"],
+
+                text_color=self.colors["dim"],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                    weight="bold",
+                ),
+
+                command=lambda p=prioridade:
+                    self._set_priority(
+                        p
+                    ),
+            )
+
+            button.grid(
+                row=0,
+                column=coluna,
+                sticky="ew",
+                padx=(
+                    (0, 3)
+                    if coluna == 0
+                    else (
+                        (3, 0)
+                        if coluna == 3
+                        else (3, 3)
+                    )
+                ),
+            )
+
+            self.priority_buttons[
+                prioridade
+            ] = button
+
+
+        self._set_priority(
+            "Nenhuma"
+        )
+
+
+        # ====================================================
+        # ERRO
+        # ====================================================
 
         self.v_err = tk.StringVar()
-        tk.Label(body, textvariable=self.v_err, bg=C["win_bg"], fg=C["red"],
-                  font=("Consolas", 8)).pack(anchor="w", pady=(4, 0))
 
-        bf = tk.Frame(body, bg=C["win_bg"])
-        bf.pack(anchor="w", pady=8)
-        tk.Button(bf, text="  Salvar  ",
-                   bg=C["green"], fg=C["win_bg"], bd=0,
-                   padx=14, pady=7, font=("Consolas", 9, "bold"),
-                   cursor="hand2",
-                   activebackground=C["accent"],
-                   activeforeground=C["win_bg"],
-                   command=self._salvar).pack(side="left")
-        tk.Button(bf, text="  Cancelar  ",
-                   bg=C["panel"], fg=C["dim"], bd=0,
-                   padx=10, pady=7, font=("Consolas", 9),
-                   cursor="hand2",
-                   activebackground=C["border"],
-                   activeforeground=C["text"],
-                   command=self.win.destroy).pack(side="left", padx=8)
 
-        self.e_txt.focus()
-        self.win.bind("<Return>", lambda e: self._salvar())
-        self.win.bind("<Escape>", lambda e: self.win.destroy())
+        self.error_label = ctk.CTkLabel(
+            body,
 
-    def _validate_live(self, *_):
-        d_ok = _validate_date(self.v_data.get()) is not None
-        h_ok = _validate_time(self.v_hora.get()) is not None
+            textvariable=self.v_err,
 
-        self.e_data.config(
-            fg=C["text"] if d_ok else C["red"]
+            text_color=self.colors["error"],
+
+            anchor="w",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+            ),
         )
 
-        self.e_hora.config(
-            fg=C["text"] if h_ok else C["red"]
+        self.error_label.pack(
+            fill="x",
+            pady=(7, 0),
         )
 
-    def _salvar(self):
-        txt = self.v_txt.get().strip()
-        desc = self.v_desc.get().strip()
 
-        data = _validate_date(self.v_data.get())
-        hora = _validate_time(self.v_hora.get())
+        # ====================================================
+        # FOOTER
+        # ====================================================
+
+        footer = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        footer.pack(
+            fill="x",
+            pady=(6, 0),
+        )
+
+
+        ctk.CTkButton(
+            footer,
+
+            text="Salvar",
+
+            height=36,
+
+            corner_radius=7,
+
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"],
+
+            text_color="#FFFFFF",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+
+            command=self._salvar,
+
+        ).pack(
+            side="left",
+            fill="x",
+            expand=True,
+            padx=(0, 4),
+        )
+
+
+        ctk.CTkButton(
+            footer,
+
+            text="Cancelar",
+
+            height=36,
+
+            corner_radius=7,
+
+            fg_color="transparent",
+            hover_color=self.colors["input_hover"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+
+            command=self._close,
+
+        ).pack(
+            side="left",
+            fill="x",
+            expand=True,
+            padx=(4, 0),
+        )
+
+
+    # ========================================================
+    # PRIORIDADE
+    # ========================================================
+
+    def _set_priority(
+        self,
+        prioridade,
+    ):
+        self.v_prioridade.set(
+            prioridade
+        )
+
+
+        for nome, button in (
+            self.priority_buttons.items()
+        ):
+
+            if nome != prioridade:
+                button.configure(
+                    fg_color="transparent",
+                    border_color=self.colors["border"],
+                    text_color=self.colors["dim"],
+                )
+
+                continue
+
+
+            if nome == "Alta":
+                button.configure(
+                    fg_color=self.colors["high_bg"],
+                    border_color=self.colors["high_fg"],
+                    text_color=self.colors["high_fg"],
+                )
+
+            elif nome == "Normal":
+                button.configure(
+                    fg_color=self.colors["normal_bg"],
+                    border_color=self.colors["normal_fg"],
+                    text_color=self.colors["normal_fg"],
+                )
+
+            elif nome == "Baixa":
+                button.configure(
+                    fg_color=self.colors["low_bg"],
+                    border_color=self.colors["low_fg"],
+                    text_color=self.colors["low_fg"],
+                )
+
+            else:
+                button.configure(
+                    fg_color=self.colors["none_bg"],
+                    border_color=self.colors["none_fg"],
+                    text_color=self.colors["none_fg"],
+                )
+
+
+    # ========================================================
+    # VALIDACAO
+    # ========================================================
+
+    def _validate_live(
+        self,
+        *_,
+    ):
+        d_ok = (
+            _validate_date(
+                self.v_data.get()
+            )
+            is not None
+        )
+
+        h_ok = (
+            _validate_time(
+                self.v_hora.get()
+            )
+            is not None
+        )
+
+
+        self.e_data.configure(
+            text_color=(
+                self.colors["text"]
+                if d_ok
+                else self.colors["error"]
+            )
+        )
+
+
+        self.e_hora.configure(
+            text_color=(
+                self.colors["text"]
+                if h_ok
+                else self.colors["error"]
+            )
+        )
+
+
+    # ========================================================
+    # SALVAR
+    # ========================================================
+
+    def _salvar(
+        self,
+    ):
+        txt = (
+            self.v_txt
+            .get()
+            .strip()
+        )
+
+
+        desc = (
+            self.desc_box
+            .get(
+                "1.0",
+                "end"
+            )
+            .strip()
+        )
+
+
+        data = _validate_date(
+            self.v_data.get()
+        )
+
+        hora = _validate_time(
+            self.v_hora.get()
+        )
+
 
         if not txt:
-            self.v_err.set("Titulo nao pode ser vazio.")
+            self.v_err.set(
+                "Título não pode ser vazio."
+            )
+
             return
+
 
         if data is None:
-            self.v_err.set("Data invalida. Use DD/MM/AAAA.")
+            self.v_err.set(
+                "Data inválida. Use DD/MM/AAAA."
+            )
+
             return
+
 
         if hora is None:
-            self.v_err.set("Horario invalido. Use HH:MM.")
+            self.v_err.set(
+                "Horário inválido. Use HH:MM."
+            )
+
             return
 
-        # Nao permite criar tarefa no minuto atual ou no passado.
+
         agora = datetime.datetime.now()
 
+
         try:
-            task_dt = datetime.datetime.strptime(
-                f"{data} {hora}",
-                "%Y-%m-%d %H:%M"
+            task_dt = (
+                datetime.datetime.strptime(
+                    f"{data} {hora}",
+                    "%Y-%m-%d %H:%M"
+                )
             )
+
         except ValueError:
-            self.v_err.set("Data ou horario invalido.")
+            self.v_err.set(
+                "Data ou horário inválido."
+            )
+
             return
+
 
         if task_dt <= agora:
             self.v_err.set(
-                "Escolha um horario a partir do proximo minuto."
+                "Escolha um horário a partir do próximo minuto."
             )
+
             return
+
 
         db_criar(
             txt,
@@ -1088,206 +1961,734 @@ class NewTaskWindow:
             self.v_prioridade.get(),
         )
 
-        self.comp.say("Tarefa criada!", "talking", 2000)
-        self.win.destroy()
+
+        self.comp.say(
+            "Tarefa criada!",
+            "talking",
+            2000
+        )
+
+
+        self._close()
+
 
 #  JANELA: LISTA DE TAREFAS
 
 class TaskWindow:
+
+    WIDTH = 470
+    HEIGHT = 610
+
     def __init__(self, parent, companion):
-        self.comp   = companion
+        self.comp = companion
         self.parent = parent
-        self.win    = _make_win(parent, "Tarefas", 440, 600, resizable=True)
-        self._build()
-        _position_near_marvin(self.win, self.comp)
 
-    def _build(self):
-        w = self.win
-        _header(w, "Tarefas")
-
-        # Filtros de status
-        fbar = tk.Frame(
-            w,
-            bg=C["win_bg"]
+        self.tema = cfg.get(
+            "tema",
+            "escuro"
         )
 
-        fbar.pack(
-            fill="x",
-            padx=10,
-            pady=(4, 1)
+        if self.tema == "claro":
+            self.colors = {
+                "bg": "#F9F8F6",
+                "card": "#FFFFFF",
+                "text": "#2C2C2A",
+                "dim": "#888780",
+                "border": "#E3E1DC",
+
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
+
+                "hover": "#F1EFE8",
+
+                "high_bg": "#FAE7E5",
+                "high_fg": "#A33A32",
+
+                "medium_bg": "#FFF0D9",
+                "medium_fg": "#9A6424",
+
+                "low_bg": "#E7F3EA",
+                "low_fg": "#39734A",
+
+                "none_bg": "#F1EFE8",
+                "none_fg": "#6F6D67",
+
+                "done_bg": "#E1F5EE",
+                "done_fg": "#238A57",
+
+                "red": "#C54B45",
+            }
+
+        else:
+            self.colors = {
+                "bg": "#1A1915",
+                "card": "#232220",
+                "text": "#EFEDE8",
+                "dim": "#85837D",
+                "border": "#34332F",
+
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
+
+                "hover": "#2C2B28",
+
+                "high_bg": "#482522",
+                "high_fg": "#F19A91",
+
+                "medium_bg": "#49351F",
+                "medium_fg": "#E8B86D",
+
+                "low_bg": "#20382A",
+                "low_fg": "#83C995",
+
+                "none_bg": "#2C2C2A",
+                "none_fg": "#B4B2A9",
+
+                "done_bg": "#04342C",
+                "done_fg": "#5DCAA5",
+
+                "red": "#F08078",
+            }
+
+        ctk.set_appearance_mode(
+            "Light"
+            if self.tema == "claro"
+            else "Dark"
         )
 
-        tk.Label(
-            fbar,
-            text="Status:",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8, "bold")
-        ).pack(
-            side="left",
-            padx=(4, 6)
+        self.win = ctk.CTkToplevel(
+            parent
         )
+
+        self.win.geometry(
+            f"{self.WIDTH}x{self.HEIGHT}"
+        )
+
+        self.win.resizable(
+            True,
+            True
+        )
+
+        self.win.minsize(
+            430,
+            500
+        )
+
+        self.win.overrideredirect(
+            True
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self._drag_x = 0
+        self._drag_y = 0
 
         self.filtro = tk.StringVar(
             value="todas"
-        )
-
-        self.sv = tk.StringVar(
-            value=""
-        )
-
-        for label, val in [
-            ("Todas", "todas"),
-            ("Pendentes", "pendentes"),
-            ("Concluidas", "concluidas"),
-        ]:
-            tk.Radiobutton(
-                fbar,
-                text=label,
-                variable=self.filtro,
-                value=val,
-                bg=C["win_bg"],
-                fg=C["dim"],
-                selectcolor=C["panel"],
-                activebackground=C["win_bg"],
-                activeforeground=C["text"],
-                font=("Consolas", 8),
-                command=self._refresh
-            ).pack(
-                side="left",
-                padx=4
-            )
-
-        # Filtro de prioridade
-        pbar = tk.Frame(
-            w,
-            bg=C["win_bg"]
-        )
-
-        pbar.pack(
-            fill="x",
-            padx=10,
-            pady=(1, 5)
-        )
-
-        tk.Label(
-            pbar,
-            text="Prioridade:",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8, "bold")
-        ).pack(
-            side="left",
-            padx=(4, 6)
         )
 
         self.filtro_prioridade = tk.StringVar(
             value="todas"
         )
 
-        for label, val in [
-            ("Todas", "todas"),
-            ("Alta", "Alta"),
-            ("Normal", "Normal"),
-            ("Baixa", "Baixa"),
-        ]:
-            tk.Radiobutton(
-                pbar,
-                text=label,
-                variable=self.filtro_prioridade,
-                value=val,
-                bg=C["win_bg"],
-                fg=C["dim"],
-                selectcolor=C["panel"],
-                activebackground=C["win_bg"],
-                activeforeground=C["text"],
-                font=("Consolas", 8),
-                command=self._refresh
-            ).pack(
-                side="left",
-                padx=4
-            )
-
-        # Busca
-        search_bar = tk.Frame(
-            w,
-            bg=C["win_bg"]
-        )
-
-        search_bar.pack(
-            fill="x",
-            padx=14,
-            pady=(1, 7)
-        )
-
-        tk.Label(
-            search_bar,
-            text="Buscar:",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8, "bold")
-        ).pack(
-            side="left",
-            padx=(0, 8)
-        )
-
         self.busca = tk.StringVar(
             value=""
         )
 
-        self.e_busca = tk.Entry(
-            search_bar,
-            textvariable=self.busca,
-            bg=C["panel"],
-            fg=C["text"],
-            insertbackground=C["accent"],
-            font=("Consolas", 9),
-            bd=0,
-            relief="flat"
+        self.status_buttons = {}
+        self.priority_buttons = {}
+
+        self._build()
+
+        _position_near_marvin(
+            self.win,
+            self.comp
         )
 
-        self.e_busca.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            ipady=5
+        self.win.bind(
+            "<Escape>",
+            lambda e: self.win.destroy()
         )
 
-        # Atualiza a lista enquanto digita.
-        self.busca.trace_add(
-            "write",
-            lambda *_: self._refresh()
+        self.win.bind(
+            "<FocusIn>",
+            lambda e: self._refresh()
         )
 
-        # Lista
-        outer = tk.Frame(w, bg=C["win_bg"])
-        outer.pack(fill="both", expand=True)
-        self._cv = tk.Canvas(outer, bg=C["win_bg"], highlightthickness=0)
-        sb = tk.Scrollbar(outer, orient="vertical", command=self._cv.yview,
-                           bg=C["panel"], troughcolor=C["win_bg"])
-        self._cv.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y")
-        self._cv.pack(side="left", fill="both", expand=True)
-        self.lf = tk.Frame(self._cv, bg=C["win_bg"])
-        self._cv.create_window((0, 0), window=self.lf, anchor="nw")
-        self.lf.bind("<Configure>",
-                      lambda e: self._cv.configure(
-                          scrollregion=self._cv.bbox("all")))
-        self._cv.bind(
-    "<MouseWheel>",
-    lambda e: self._cv.yview_scroll(
-        -1 if e.delta > 0 else 1,
-        "units"
-    )
-)
+
+    # ========================================================
+    # JANELA
+    # ========================================================
+
+    def _drag_start(self, event):
+        self._drag_x = (
+            event.x_root
+            - self.win.winfo_x()
+        )
+
+        self._drag_y = (
+            event.y_root
+            - self.win.winfo_y()
+        )
+
+
+    def _drag_move(self, event):
+        x = (
+            event.x_root
+            - self._drag_x
+        )
+
+        y = (
+            event.y_root
+            - self._drag_y
+        )
+
+        self.win.geometry(
+            f"+{x}+{y}"
+        )
+
+
+    # ========================================================
+    # BOTAO DE FILTRO
+    # ========================================================
+
+    def _filter_button(
+        self,
+        parent,
+        texto,
+        valor,
+        var,
+        grupo,
+        coluna,
+    ):
+        b = ctk.CTkButton(
+            parent,
+
+            text=texto,
+
+            height=34,
+
+            corner_radius=8,
+
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+            ),
+
+            command=lambda: self._set_filter(
+                var,
+                valor,
+                grupo
+            ),
+        )
+
+        b.grid(
+            row=0,
+            column=coluna,
+            sticky="ew",
+            padx=3,
+        )
+
+        grupo[valor] = b
+
+        return b
+
+
+    def _set_filter(
+        self,
+        var,
+        valor,
+        grupo,
+    ):
+        var.set(
+            valor
+        )
+
+        for chave, button in grupo.items():
+
+            selecionado = (
+                chave == valor
+            )
+
+            button.configure(
+                fg_color=(
+                    self.colors["hover"]
+                    if selecionado
+                    else "transparent"
+                ),
+
+                border_color=(
+                    self.colors["accent"]
+                    if selecionado
+                    else self.colors["border"]
+                ),
+
+                text_color=(
+                    self.colors["accent"]
+                    if selecionado
+                    else self.colors["text"]
+                ),
+            )
 
         self._refresh()
 
+
+    # ========================================================
+    # INTERFACE
+    # ========================================================
+
+    def _build(self):
+
+        shell = ctk.CTkFrame(
+            self.win,
+
+            fg_color=self.colors["bg"],
+
+            corner_radius=14,
+
+            border_width=1,
+            border_color=self.colors["border"],
+        )
+
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=1,
+            pady=1,
+        )
+
+
+        # ====================================================
+        # TITLEBAR
+        # ====================================================
+
+        titlebar = ctk.CTkFrame(
+            shell,
+            height=44,
+            fg_color="transparent",
+        )
+
+        titlebar.pack(
+            fill="x"
+        )
+
+        titlebar.pack_propagate(
+            False
+        )
+
+        titlebar.bind(
+            "<ButtonPress-1>",
+            self._drag_start
+        )
+
+        titlebar.bind(
+            "<B1-Motion>",
+            self._drag_move
+        )
+
+
+        ctk.CTkLabel(
+            titlebar,
+
+            text="MARVIN — TAREFAS",
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left",
+            padx=16,
+        )
+
+
+        ctk.CTkButton(
+            titlebar,
+
+            text="×",
+
+            width=28,
+            height=28,
+
+            corner_radius=7,
+
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=17,
+                weight="bold",
+            ),
+
+            command=self.win.destroy,
+
+        ).pack(
+            side="right",
+            padx=10,
+        )
+
+
+        ctk.CTkFrame(
+            shell,
+            height=1,
+            fg_color=self.colors["border"],
+        ).pack(
+            fill="x"
+        )
+
+
+        # ====================================================
+        # CORPO
+        # ====================================================
+
+        body = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        body.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=(16, 14),
+        )
+
+
+        # ====================================================
+        # TITULO + NOVA
+        # ====================================================
+
+        header = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        header.pack(
+            fill="x",
+            pady=(0, 16),
+        )
+
+
+        ctk.CTkLabel(
+            header,
+
+            text="Tarefas",
+
+            text_color=self.colors["text"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=17,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left"
+        )
+
+
+        ctk.CTkButton(
+            header,
+
+            text="+ Nova",
+
+            width=68,
+            height=30,
+
+            corner_radius=8,
+
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"],
+
+            text_color="#FFFFFF",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+
+            command=lambda:
+                NewTaskWindow(
+                    self.win,
+                    self.comp
+                ),
+
+        ).pack(
+            side="right"
+        )
+
+
+        # ====================================================
+        # STATUS
+        # ====================================================
+
+        status_line = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        status_line.pack(
+            fill="x",
+            pady=(0, 7),
+        )
+
+
+        ctk.CTkLabel(
+            status_line,
+
+            text="STATUS",
+
+            width=68,
+
+            anchor="w",
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left"
+        )
+
+
+        status_buttons = ctk.CTkFrame(
+            status_line,
+            fg_color="transparent",
+        )
+
+        status_buttons.pack(
+            side="left",
+            fill="x",
+            expand=True,
+        )
+
+        for coluna in range(3):
+            status_buttons.grid_columnconfigure(
+                coluna,
+                weight=1,
+                uniform="status",
+            )
+
+        for coluna, (texto, valor) in enumerate((
+            ("Todas", "todas"),
+            ("Pendentes", "pendentes"),
+            ("Concluídas", "concluidas"),
+        )):
+            self._filter_button(
+                status_buttons,
+                texto,
+                valor,
+                self.filtro,
+                self.status_buttons,
+                coluna,
+            )
+
+
+        # ====================================================
+        # PRIORIDADE
+        # ====================================================
+
+        priority_line = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        priority_line.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+
+        ctk.CTkLabel(
+            priority_line,
+
+            text="PRIORIDADE",
+
+            width=68,
+
+            anchor="w",
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left"
+        )
+
+
+        priority_buttons = ctk.CTkFrame(
+            priority_line,
+            fg_color="transparent",
+        )
+
+        priority_buttons.pack(
+            side="left",
+            fill="x",
+            expand=True,
+        )
+
+        for coluna in range(5):
+            priority_buttons.grid_columnconfigure(
+                coluna,
+                weight=1,
+                uniform="prioridade",
+            )
+
+        for coluna, (texto, valor) in enumerate((
+            ("Todas", "todas"),
+            ("Alta", "Alta"),
+            ("Média", "Normal"),
+            ("Baixa", "Baixa"),
+            ("Nenhuma", "Nenhuma"),
+        )):
+            self._filter_button(
+                priority_buttons,
+                texto,
+                valor,
+                self.filtro_prioridade,
+                self.priority_buttons,
+                coluna,
+            )
+
+
+        self._set_filter(
+            self.filtro,
+            "todas",
+            self.status_buttons,
+        )
+
+        self._set_filter(
+            self.filtro_prioridade,
+            "todas",
+            self.priority_buttons,
+        )
+
+
+        # ====================================================
+        # BUSCA
+        # ====================================================
+
+        self.search_entry = ctk.CTkEntry(
+            body,
+
+            textvariable=self.busca,
+
+            height=36,
+
+            corner_radius=8,
+
+            fg_color=self.colors["card"],
+
+            border_width=1,
+            border_color=self.colors["border"],
+
+            text_color=self.colors["text"],
+
+            placeholder_text="Buscar tarefa...",
+            placeholder_text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+            ),
+        )
+
+        self.search_entry.pack(
+            fill="x",
+            pady=(0, 13),
+        )
+
+
+        self.busca.trace_add(
+            "write",
+            lambda *_:
+                self._refresh()
+        )
+
+
+        ctk.CTkFrame(
+            body,
+            height=1,
+            fg_color=self.colors["border"],
+        ).pack(
+            fill="x",
+            pady=(0, 7),
+        )
+
+
+        # ====================================================
+        # LISTA
+        # ====================================================
+
+        self.lf = ctk.CTkScrollableFrame(
+            body,
+
+            fg_color="transparent",
+
+            scrollbar_button_color=
+                self.colors["border"],
+
+            scrollbar_button_hover_color=
+                self.colors["dim"],
+        )
+
+        self.lf.pack(
+            fill="both",
+            expand=True,
+        )
+
+
+        self._refresh()
+
+
+    # ========================================================
+    # REFRESH
+    # ========================================================
+
     def _refresh(self):
-        for widget in self.lf.winfo_children():
+
+        if not hasattr(
+            self,
+            "lf"
+        ):
+            return
+
+
+        for widget in (
+            self.lf.winfo_children()
+        ):
             widget.destroy()
 
+
         rows = db_listar()
+
 
         filtro_status = (
             self.filtro.get()
@@ -1297,242 +2698,597 @@ class TaskWindow:
             self.filtro_prioridade.get()
         )
 
-        streak = db_streak_hoje()
-
-        # Guarda a prioridade uma unica vez
-        # para cada tarefa durante este refresh.
-        prioridades = {
-            row[0]: db_prioridade(row[0])
-            for row in rows
-        }
-
-        # Aplica o filtro de prioridade.
-        if filtro_prioridade != "todas":
-            rows_filtradas = [
-                row
-                for row in rows
-                if prioridades.get(
-                    row[0],
-                    "Normal"
-                ) == filtro_prioridade
-            ]
-        else:
-            rows_filtradas = list(rows)
-
-        # Aplica busca por titulo ou descricao.
-        termo_busca = (
-            self.busca.get()
+        busca = (
+            self.busca
+            .get()
             .strip()
             .lower()
         )
 
-        if termo_busca:
-            rows_filtradas = [
-                row
-                for row in rows_filtradas
-                if (
-                    termo_busca
-                    in str(row[1]).lower()
-                    or termo_busca
-                    in str(row[2] or "").lower()
+
+        prioridades = {
+            row[0]:
+                (
+                    db_prioridade(
+                        row[0]
+                    )
+                    or "Nenhuma"
                 )
-            ]
 
-        pending = [
-            r
-            for r in rows_filtradas
-            if not r[6]
-        ]
+            for row in rows
+        }
 
-        done_l = [
-            r
-            for r in rows_filtradas
-            if r[6]
-        ]
 
-        streak_txt = (
-            f"  {streak} concluida(s) hoje"
-            if streak
-            else ""
-        )
+        filtradas = []
 
-        self.sv.set(
-            f"   {len(done_l)}/"
-            f"{len(rows_filtradas)} concluidas"
-            f"  |  {len(pending)} pendente(s)"
-            f"{streak_txt}"
-        )
 
-        # Nenhuma tarefa no banco.
-        if not rows:
-            tk.Label(
-                self.lf,
-                text=(
-                    "Nenhuma tarefa ainda.\n"
-                    "Clique + para criar."
-                ),
-                bg=C["win_bg"],
-                fg=C["dim"],
-                font=("Consolas", 9, "italic"),
-                justify="center",
-                pady=30
-            ).pack()
+        for row in rows:
 
-            return
+            tid = row[0]
+            texto = str(
+                row[1] or ""
+            )
 
-        # Existem tarefas, mas nenhuma corresponde
-        # ao filtro selecionado.
-        if not rows_filtradas:
-            tk.Label(
-                self.lf,
-                text=(
-                    "Nenhuma tarefa encontrada "
-                    "com esse filtro ou busca."
-                ),
-                bg=C["win_bg"],
-                fg=C["dim"],
-                font=("Consolas", 9, "italic"),
-                justify="center",
-                pady=30
-            ).pack()
+            desc = str(
+                row[2] or ""
+            )
 
-            return
+            concluida = bool(
+                row[6]
+            )
 
-        def section(title, lst):
-            if not lst:
-                return
-            tk.Label(self.lf, text=title, bg=C["win_bg"], fg=C["accent"],
-                      font=("Consolas", 8, "bold"), pady=4
-                      ).pack(anchor="w", padx=12)
-            tk.Frame(self.lf, bg=C["border"], height=1
-                     ).pack(fill="x", padx=8, pady=1)
-            for row in lst:
-                self._row(row)
+            prioridade = (
+                prioridades.get(
+                    tid
+                )
+                or "Nenhuma"
+            )
 
-        if filtro_status in ("todas", "pendentes"):
-            section("  TAREFAS PENDENTES", pending)
-        if filtro_status in ("todas", "concluidas"):
-            section("  TAREFAS CONCLUIDAS", done_l)
 
-    def _row(self, row):
-        tid, texto, desc, data, hora, rep, concluida, lembrado = row
-
-        prioridade = db_prioridade(
-            tid
-        )
-
-        bg = (
-            C["panel"]
-            if not concluida
-            else C["win_bg"]
-        )
-        row_f = tk.Frame(self.lf, bg=bg)
-        row_f.pack(fill="x", pady=2, padx=6)
-
-        icon = "v" if concluida else "o"
-        ic   = tk.Label(row_f, text=icon, bg=bg,
-                         fg=C["green"] if concluida else C["accent"],
-                         font=("Consolas", 11), padx=8, cursor="hand2")
-        ic.pack(side="left")
-        ic.bind("<Button-1>", lambda e, i=tid: self._toggle(i))
-
-        info = tk.Frame(row_f, bg=bg)
-        info.pack(side="left", fill="x", expand=True, pady=5)
-        if concluida:
-            titulo_fg = C["dim"]
-
-        elif prioridade == "Alta":
-            titulo_fg = C["red"]
-
-        elif prioridade == "Baixa":
-            titulo_fg = C["dim"]
-
-        else:
-            titulo_fg = C["text"]
-
-        tk.Label(
-            info,
-            text=texto,
-            bg=bg,
-            fg=titulo_fg,
-            font=("Consolas", 9),
-            anchor="w",
-            wraplength=220,
-            justify="left"
-        ).pack(
-            anchor="w"
-        )
-
-        parts = []
-
-        if prioridade == "Alta":
-            parts.append("! ALTA")
-
-        elif prioridade == "Baixa":
-            parts.append("BAIXA")
-
-        else:
-            parts.append("NORMAL")
-        try:
-            d    = datetime.date.fromisoformat(data)
-            hoje = datetime.date.today()
-            if d == hoje:
-                parts.append("Hoje")
-            elif d < hoje and not concluida:
-                parts.append("ATRASADA")
-            else:
-                parts.append(d.strftime("%d/%m/%y"))
-        except Exception:
-            pass
-        if hora:
-            parts.append(hora[:5])
-        if rep != "Nunca":
-            parts.append(f"rep: {rep}")
-        if desc:
-            parts.append(f"| {desc[:28]}")
-        if parts:
-            tk.Label(info, text="  ".join(parts), bg=bg, fg=C["dim"],
-                      font=("Consolas", 7)).pack(anchor="w")
-
-        bf = tk.Frame(row_f, bg=bg)
-        bf.pack(side="right", padx=6)
-        tk.Button(bf, text="Editar", bg=bg, fg=C["accent"], bd=0,
-                   font=("Consolas", 8), cursor="hand2",
-                   activebackground=C["border"],
-                   activeforeground=C["text"],
-                   command=lambda i=tid: EditTaskWindow(
-                       self.win, self.comp, i, self._refresh)
-                   ).pack(side="left", padx=2)
-        tk.Button(bf, text="Excluir", bg=bg, fg=C["red"], bd=0,
-                   font=("Consolas", 8), cursor="hand2",
-                   activebackground=C["border"],
-                   activeforeground=C["text"],
-                   command=lambda i=tid: self._delete(i)
-                   ).pack(side="left", padx=2)
-
-    def _toggle(self, tid):
-        for r in db_listar():
-            if r[0] != tid:
+            if (
+                filtro_status
+                == "pendentes"
+                and concluida
+            ):
                 continue
 
-            if r[6]:
-                db_desconcluir(tid)
+
+            if (
+                filtro_status
+                == "concluidas"
+                and not concluida
+            ):
+                continue
+
+
+            if (
+                filtro_prioridade
+                != "todas"
+                and prioridade
+                != filtro_prioridade
+            ):
+                continue
+
+
+            if (
+                busca
+                and busca
+                not in (
+                    texto
+                    + " "
+                    + desc
+                ).lower()
+            ):
+                continue
+
+
+            filtradas.append(
+                row
+            )
+
+
+        pending = [
+            row
+            for row in filtradas
+            if not row[6]
+        ]
+
+
+        done = [
+            row
+            for row in filtradas
+            if row[6]
+        ]
+
+
+        if (
+            filtro_status
+            in ("todas", "pendentes")
+            and pending
+        ):
+            self._section(
+                "PENDENTES",
+                pending
+            )
+
+
+        if (
+            filtro_status
+            in ("todas", "concluidas")
+            and done
+        ):
+            self._section(
+                "CONCLUÍDAS",
+                done
+            )
+
+
+        if not pending and not done:
+            ctk.CTkLabel(
+                self.lf,
+
+                text="Nenhuma tarefa encontrada.",
+
+                text_color=self.colors["dim"],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                ),
+
+            ).pack(
+                pady=30
+            )
+
+
+    # ========================================================
+    # SECAO
+    # ========================================================
+
+    def _section(
+        self,
+        titulo,
+        rows,
+    ):
+
+        head = ctk.CTkFrame(
+            self.lf,
+            fg_color="transparent",
+        )
+
+        head.pack(
+            fill="x",
+            pady=(8, 5),
+        )
+
+
+        ctk.CTkLabel(
+            head,
+
+            text=titulo,
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left"
+        )
+
+
+        ctk.CTkLabel(
+            head,
+
+            text=str(
+                len(rows)
+            ),
+
+            width=25,
+            height=20,
+
+            corner_radius=10,
+
+            fg_color=self.colors["hover"],
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+            ),
+
+        ).pack(
+            side="left",
+            padx=(7, 0),
+        )
+
+
+        for row in rows:
+            self._row(
+                row
+            )
+
+
+    # ========================================================
+    # TAREFA
+    # ========================================================
+
+    def _row(
+        self,
+        row,
+    ):
+
+        (
+            tid,
+            texto,
+            desc,
+            data,
+            hora,
+            rep,
+            concluida,
+            lembrado,
+        ) = row
+
+
+        prioridade = (
+            db_prioridade(
+                tid
+            )
+            or "Nenhuma"
+        )
+
+
+        task = ctk.CTkFrame(
+            self.lf,
+
+            fg_color="transparent",
+
+            corner_radius=0,
+        )
+
+        task.pack(
+            fill="x",
+            pady=(0, 2),
+        )
+
+
+        # ----------------------------------------------------
+        # CHECK
+        # ----------------------------------------------------
+
+        check = ctk.CTkButton(
+            task,
+
+            text="✓" if concluida else "",
+
+            width=21,
+            height=21,
+
+            corner_radius=11,
+
+            fg_color=(
+                self.colors["done_bg"]
+                if concluida
+                else "transparent"
+            ),
+
+            hover_color=self.colors[
+                "done_bg"
+            ],
+
+            border_width=1,
+
+            border_color=(
+                self.colors["done_fg"]
+                if concluida
+                else self.colors["border"]
+            ),
+
+            text_color=self.colors[
+                "done_fg"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+
+            command=lambda i=tid:
+                self._toggle_done(i),
+        )
+
+        check.pack(
+            side="left",
+            anchor="n",
+            padx=(0, 9),
+            pady=(7, 0),
+        )
+
+
+        # ----------------------------------------------------
+        # TEXTO
+        # ----------------------------------------------------
+
+        center = ctk.CTkFrame(
+            task,
+            fg_color="transparent",
+        )
+
+        center.pack(
+            side="left",
+            fill="both",
+            expand=True,
+            pady=5,
+        )
+
+
+        titulo = ctk.CTkLabel(
+            center,
+
+            text=texto,
+
+            text_color=(
+                self.colors["dim"]
+                if concluida
+                else self.colors["text"]
+            ),
+
+            anchor="w",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight=(
+                    "normal"
+                    if concluida
+                    else "bold"
+                ),
+            ),
+        )
+
+        titulo.pack(
+            fill="x"
+        )
+
+
+        meta = ctk.CTkFrame(
+            center,
+            fg_color="transparent",
+        )
+
+        meta.pack(
+            fill="x",
+            pady=(3, 0),
+        )
+
+
+        if prioridade == "Alta":
+            p_bg = self.colors["high_bg"]
+            p_fg = self.colors["high_fg"]
+            p_text = "Alta"
+
+        elif prioridade == "Normal":
+            p_bg = self.colors["medium_bg"]
+            p_fg = self.colors["medium_fg"]
+            p_text = "Média"
+
+        elif prioridade == "Baixa":
+            p_bg = self.colors["low_bg"]
+            p_fg = self.colors["low_fg"]
+            p_text = "Baixa"
+
+        else:
+            p_bg = self.colors["none_bg"]
+            p_fg = self.colors["none_fg"]
+            p_text = "Nenhuma"
+
+
+        ctk.CTkLabel(
+            meta,
+
+            text=p_text,
+
+            height=19,
+
+            corner_radius=6,
+
+            fg_color=p_bg,
+
+            text_color=p_fg,
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left"
+        )
+
+
+        try:
+            data_br = (
+                datetime.datetime
+                .strptime(
+                    data,
+                    "%Y-%m-%d"
+                )
+                .strftime(
+                    "%d/%m/%y"
+                )
+            )
+
+        except Exception:
+            data_br = data
+
+
+        ctk.CTkLabel(
+            meta,
+
+            text=f"{data_br} · {hora[:5]}",
+
+            text_color=self.colors["dim"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+
+        ).pack(
+            side="left",
+            padx=(7, 0),
+        )
+
+
+        # ----------------------------------------------------
+        # ACOES
+        # ----------------------------------------------------
+
+        actions = ctk.CTkFrame(
+            task,
+            fg_color="transparent",
+        )
+
+        actions.pack(
+            side="right",
+            anchor="n",
+            pady=6,
+        )
+
+
+        ctk.CTkButton(
+            actions,
+
+            text="Editar",
+
+            width=42,
+            height=23,
+
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+
+            text_color=self.colors["accent"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+
+            command=lambda i=tid:
+                EditTaskWindow(
+                    self.win,
+                    self.comp,
+                    i,
+                    self._refresh
+                ),
+        ).pack(
+            side="left"
+        )
+
+
+        ctk.CTkButton(
+            actions,
+
+            text="Excluir",
+
+            width=45,
+            height=23,
+
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+
+            text_color=self.colors["red"],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+
+            command=lambda i=tid:
+                self._delete(i),
+        ).pack(
+            side="left"
+        )
+
+
+        ctk.CTkFrame(
+            self.lf,
+
+            height=1,
+
+            fg_color=self.colors["border"],
+
+        ).pack(
+            fill="x",
+            pady=(2, 3),
+        )
+
+
+    # ========================================================
+    # CONCLUIR / DESCONCLUIR
+    # ========================================================
+
+    def _toggle_done(
+        self,
+        tid,
+    ):
+
+        for row in db_listar():
+
+            if row[0] != tid:
+                continue
+
+
+            if row[6]:
+                db_desconcluir(
+                    tid
+                )
+
             else:
-                db_concluir(tid)
+                db_concluir(
+                    tid
+                )
 
             break
 
+
         self._refresh()
 
-        self.comp.say("Tarefa atualizada!", "talking", 2000)
 
-    def _delete(self, tid):
-        if messagebox.askyesno("Marvin", "Excluir esta tarefa?",
-                                parent=self.win):
-            db_excluir(tid)
+        self.comp.say(
+            "Tarefa atualizada!",
+            "talking",
+            2000
+        )
+
+
+    # ========================================================
+    # EXCLUIR
+    # ========================================================
+
+    def _delete(
+        self,
+        tid,
+    ):
+
+        if messagebox.askyesno(
+            "MARVIN",
+            "Excluir esta tarefa?",
+            parent=self.win,
+        ):
+            db_excluir(
+                tid
+            )
+
             self._refresh()
 
-#  JANELA: EDITAR TAREFA
+
 
 class EditTaskWindow:
     def __init__(self, parent, companion, tid, callback):
@@ -2310,36 +4066,148 @@ class SettingsWindow:
 #  PAINEL FLUTUANTE (clique esquerdo)
 
 class InteractionPanel:
-    def __init__(self, root, companion, mode="idle"):
+
+    WIDTH = 232
+
+    def __init__(
+        self,
+        root,
+        companion,
+        mode="idle",
+    ):
         self.comp = companion
         self.root = root
-        self.win  = tk.Toplevel(root)
-        self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.configure(bg=C["border"])
+        self.mode = mode
 
-        rx = root.winfo_x()
-        ry = root.winfo_y()
-        rw = companion.W
+        self.tema = cfg.get(
+            "tema",
+            "escuro",
+        )
 
-        inner = tk.Frame(self.win, bg=C["panel"])
-        inner.pack(padx=1, pady=1)
+        if self.tema == "claro":
+            self.colors = {
+                "bg": "#F9F8F6",
+                "card": "#FFFFFF",
+                "text": "#2C2C2A",
+                "dim": "#888780",
+                "border": "#E3E1DC",
+
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
+
+                "green": "#238A57",
+                "green_bg": "#E1F5EE",
+
+                "orange_bg": "#FAECE7",
+
+                "hover": "#F1EFE8",
+            }
+
+        else:
+            self.colors = {
+                "bg": "#1A1915",
+                "card": "#232220",
+                "text": "#EFEDE8",
+                "dim": "#85837D",
+                "border": "#34332F",
+
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
+
+                "green": "#5DCAA5",
+                "green_bg": "#04342C",
+
+                "orange_bg": "#4A1B0C",
+
+                "hover": "#2C2B28",
+            }
+
+        ctk.set_appearance_mode(
+            "Light"
+            if self.tema == "claro"
+            else "Dark"
+        )
+
+        self.win = ctk.CTkToplevel(
+            root
+        )
+
+        self.win.overrideredirect(
+            True
+        )
+
+        self.win.attributes(
+            "-topmost",
+            True
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self.shell = ctk.CTkFrame(
+            self.win,
+
+            width=self.WIDTH,
+
+            fg_color=self.colors["bg"],
+
+            corner_radius=14,
+
+            border_width=1,
+            border_color=self.colors["border"],
+        )
+
+        self.shell.pack(
+            fill="both",
+            expand=True,
+            padx=1,
+            pady=1,
+        )
 
         if mode == "alert":
-            self._build_alert(inner)
+            self._build_alert(
+                self.shell
+            )
         else:
-            self._build_idle(inner)
+            self._build_idle(
+                self.shell
+            )
 
-        # -----------------------------------------------------
-        # POSICIONAMENTO MULTI-MONITOR
-        # Abre o painel sempre no mesmo monitor do MARVIN.
-        # -----------------------------------------------------
+        self._position()
+
+        # Nao fecha imediatamente quando o clique
+        # em um botao altera o foco.
+        self.win.bind(
+            "<FocusOut>",
+            self._on_focus_out
+        )
+
+        self.win.bind(
+            "<Escape>",
+            lambda e:
+                self._close()
+        )
+
+        self.win.focus_force()
+
+
+    # ========================================================
+    # POSICIONAMENTO
+    # ========================================================
+
+    def _position(self):
+        root = self.root
+
         self.win.update_idletasks()
 
         ww = self.win.winfo_reqwidth()
         wh = self.win.winfo_reqheight()
 
-        # Fallback para a tela principal
+        rx = root.winfo_x()
+        ry = root.winfo_y()
+        rw = self.comp.W
+
         mon_left = 0
         mon_top = 0
         mon_right = root.winfo_screenwidth()
@@ -2350,151 +4218,922 @@ class InteractionPanel:
                 import ctypes
                 from ctypes import wintypes
 
-                class MONITORINFO(ctypes.Structure):
+                class MONITORINFO(
+                    ctypes.Structure
+                ):
                     _fields_ = [
-                        ("cbSize", wintypes.DWORD),
-                        ("rcMonitor", wintypes.RECT),
-                        ("rcWork", wintypes.RECT),
-                        ("dwFlags", wintypes.DWORD),
+                        (
+                            "cbSize",
+                            wintypes.DWORD
+                        ),
+                        (
+                            "rcMonitor",
+                            wintypes.RECT
+                        ),
+                        (
+                            "rcWork",
+                            wintypes.RECT
+                        ),
+                        (
+                            "dwFlags",
+                            wintypes.DWORD
+                        ),
                     ]
 
-                user32 = ctypes.windll.user32
+                user32 = (
+                    ctypes.windll.user32
+                )
 
-                monitor = user32.MonitorFromWindow(
-                    root.winfo_id(),
-                    2  # MONITOR_DEFAULTTONEAREST
+                monitor = (
+                    user32.MonitorFromWindow(
+                        root.winfo_id(),
+                        2
+                    )
                 )
 
                 info = MONITORINFO()
-                info.cbSize = ctypes.sizeof(MONITORINFO)
+                info.cbSize = (
+                    ctypes.sizeof(
+                        MONITORINFO
+                    )
+                )
 
                 if user32.GetMonitorInfoW(
                     monitor,
                     ctypes.byref(info)
                 ):
-                    mon_left = info.rcWork.left
-                    mon_top = info.rcWork.top
-                    mon_right = info.rcWork.right
-                    mon_bottom = info.rcWork.bottom
+                    mon_left = (
+                        info.rcWork.left
+                    )
+
+                    mon_top = (
+                        info.rcWork.top
+                    )
+
+                    mon_right = (
+                        info.rcWork.right
+                    )
+
+                    mon_bottom = (
+                        info.rcWork.bottom
+                    )
 
             except Exception:
                 pass
 
-        gap = 6
+        gap = 8
 
-        # Primeiro tenta abrir à esquerda do MARVIN.
-        if rx - ww - gap >= mon_left:
-            px = rx - ww - gap
-
-        # Se nao houver espaco, abre à direita.
-        elif rx + rw + gap + ww <= mon_right:
-            px = rx + rw + gap
-
-        else:
-            # Ultimo recurso: mantem dentro do monitor atual.
-            px = max(
-                mon_left,
-                min(rx + rw + gap, mon_right - ww)
+        if (
+            rx - ww - gap
+            >= mon_left
+        ):
+            px = (
+                rx
+                - ww
+                - gap
             )
 
-        # Mantem também dentro da altura do monitor.
+        elif (
+            rx
+            + rw
+            + gap
+            + ww
+            <= mon_right
+        ):
+            px = (
+                rx
+                + rw
+                + gap
+            )
+
+        else:
+            px = max(
+                mon_left,
+                min(
+                    rx + rw + gap,
+                    mon_right - ww
+                )
+            )
+
         py = max(
             mon_top,
-            min(ry + 20, mon_bottom - wh)
+            min(
+                ry + 15,
+                mon_bottom - wh
+            )
         )
 
-        self.win.geometry(f"+{px}+{py}")
+        self.win.geometry(
+            f"+{px}+{py}"
+        )
 
-        self.win.bind("<FocusOut>", lambda e: self._close())
-        self.win.focus_force()
+
+    # ========================================================
+    # FECHAMENTO / FOCO
+    # ========================================================
+
+    def _on_focus_out(
+        self,
+        event=None,
+    ):
+        try:
+            self.win.after(
+                50,
+                self._check_focus_out
+            )
+
+        except Exception:
+            pass
+
+
+    def _check_focus_out(self):
+        try:
+            if not self.win.winfo_exists():
+                return
+
+            mouse_x = (
+                self.win.winfo_pointerx()
+            )
+
+            mouse_y = (
+                self.win.winfo_pointery()
+            )
+
+            x = (
+                self.win.winfo_rootx()
+            )
+
+            y = (
+                self.win.winfo_rooty()
+            )
+
+            largura = (
+                self.win.winfo_width()
+            )
+
+            altura = (
+                self.win.winfo_height()
+            )
+
+            mouse_dentro = (
+                x
+                <= mouse_x
+                <= x + largura
+
+                and
+
+                y
+                <= mouse_y
+                <= y + altura
+            )
+
+            if mouse_dentro:
+                return
+
+            foco = (
+                self.win.focus_get()
+            )
+
+            if foco is not None:
+                try:
+                    if (
+                        foco.winfo_toplevel()
+                        == self.win
+                    ):
+                        return
+
+                except Exception:
+                    pass
+
+            self._close()
+
+        except tk.TclError:
+            pass
+
+        except Exception:
+            pass
+
 
     def _close(self):
         try:
             self.win.destroy()
+
         except Exception:
             pass
 
-    def _btn(self, parent, text, cmd, fg=None):
-        b = tk.Button(parent, text=text, bg=C["win_bg"],
-                       fg=fg or C["text"], bd=0,
-                       padx=14, pady=7, cursor="hand2",
-                       font=("Consolas", 9),
-                       activebackground=C["border"],
-                       activeforeground=C["text"],
-                       command=cmd)
-        b.pack(fill="x", padx=6, pady=2)
-        return b
 
-    def _build_idle(self, p):
-        rows   = db_listar()
-        n      = len([r for r in rows if not r[6]])
-        hoje   = datetime.date.today().isoformat()
-        n_hoje = len([r for r in rows if not r[6] and r[3] == hoje])
-        streak = db_streak_hoje()
+    # ========================================================
+    # HEADER
+    # ========================================================
 
-        lines = []
-        if n:
-            lines.append(f"{n} tarefa(s) pendente(s).")
-            if n_hoje:
-                lines.append(f"{n_hoje} para hoje.")
+    def _header(self, parent):
+
+        header = ctk.CTkFrame(
+            parent,
+            height=49,
+            fg_color="transparent",
+        )
+
+        header.pack(
+            fill="x",
+        )
+
+        header.pack_propagate(
+            False
+        )
+
+
+        # Cabeca do MARVIN
+        icon_path = (
+            Path(__file__)
+            .resolve()
+            .parent
+            .parent
+            / "assets"
+            / "marvin"
+            / "marvin_head.png"
+        )
+
+        try:
+            self.header_marvin_image = ctk.CTkImage(
+                light_image=Image.open(
+                    icon_path
+                ),
+                dark_image=Image.open(
+                    icon_path
+                ),
+                size=(30, 30),
+            )
+
+            ctk.CTkLabel(
+                header,
+                text="",
+                image=self.header_marvin_image,
+                width=30,
+                height=30,
+            ).pack(
+                side="left",
+                padx=(12, 0),
+            )
+
+        except Exception:
+            # Fallback caso a imagem nao seja encontrada.
+            ctk.CTkLabel(
+                header,
+                text="M",
+                width=28,
+                height=28,
+                corner_radius=7,
+                fg_color=self.colors["accent"],
+                text_color="#FFFFFF",
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                    weight="bold",
+                ),
+            ).pack(
+                side="left",
+                padx=(12, 0),
+            )
+
+
+        ctk.CTkLabel(
+            header,
+
+            text="MARVIN",
+
+            text_color=self.colors[
+                "text"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+
+        ).pack(
+            side="left",
+            padx=(8, 0),
+        )
+
+
+        ctk.CTkFrame(
+            parent,
+
+            height=1,
+
+            corner_radius=0,
+
+            fg_color=self.colors[
+                "border"
+            ],
+
+        ).pack(
+            fill="x",
+            padx=14,
+        )
+
+
+    # ========================================================
+    # BOTAO
+    # ========================================================
+
+    def _button(
+        self,
+        parent,
+        text,
+        command,
+        accent=False,
+    ):
+
+        if accent:
+            fg = self.colors[
+                "accent"
+            ]
+
+            hover = self.colors[
+                "accent_hover"
+            ]
+
+            text_color = "#FFFFFF"
+
+            border_width = 0
+
         else:
-            lines.append("Nenhuma tarefa pendente.")
+            fg = "transparent"
+
+            hover = self.colors[
+                "hover"
+            ]
+
+            text_color = self.colors[
+                "text"
+            ]
+
+            border_width = 1
+
+
+        button = ctk.CTkButton(
+            parent,
+
+            text=text,
+
+            height=32,
+
+            corner_radius=7,
+
+            fg_color=fg,
+
+            hover_color=hover,
+
+            text_color=text_color,
+
+            border_width=border_width,
+            border_color=self.colors[
+                "border"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+
+            command=command,
+        )
+
+        button.pack(
+            fill="x",
+            padx=14,
+            pady=3,
+        )
+
+        return button
+
+
+    # ========================================================
+    # MODO NORMAL
+    # ========================================================
+
+    def _build_idle(
+        self,
+        parent,
+    ):
+
+        self._header(
+            parent
+        )
+
+
+        rows = db_listar()
+
+        n = len([
+            r
+            for r in rows
+            if not r[6]
+        ])
+
+
+        hoje = (
+            datetime.date.today()
+            .isoformat()
+        )
+
+        n_hoje = len([
+            r
+            for r in rows
+            if (
+                not r[6]
+                and r[3] == hoje
+            )
+        ])
+
+
+        streak = (
+            db_streak_hoje()
+        )
+
+
+        body = ctk.CTkFrame(
+            parent,
+            fg_color="transparent",
+        )
+
+        body.pack(
+            fill="x",
+            padx=8,
+            pady=(14, 7),
+        )
+
+
+        # ----------------------------------------------------
+        # ICONE CENTRAL
+        # ----------------------------------------------------
+
+        if n == 0:
+            icon_bg = self.colors[
+                "green_bg"
+            ]
+
+            icon_fg = self.colors[
+                "green"
+            ]
+
+            icon_text = "✓"
+
+        else:
+            icon_bg = self.colors[
+                "orange_bg"
+            ]
+
+            icon_fg = self.colors[
+                "accent"
+            ]
+
+            icon_text = str(
+                min(n, 99)
+            )
+
+
+        icon = ctk.CTkFrame(
+            body,
+
+            width=34,
+            height=34,
+
+            corner_radius=17,
+
+            fg_color=icon_bg,
+
+            border_width=1,
+            border_color=icon_fg,
+        )
+
+        icon.pack()
+
+        icon.pack_propagate(
+            False
+        )
+
+
+        ctk.CTkLabel(
+            icon,
+
+            text=icon_text,
+
+            text_color=icon_fg,
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=14,
+                weight="bold",
+            ),
+
+        ).place(
+            relx=0.5,
+            rely=0.5,
+            anchor="center",
+        )
+
+
+        # ----------------------------------------------------
+        # MENSAGEM
+        # ----------------------------------------------------
+
+        if n == 0:
+            mensagem = (
+                "Nenhuma tarefa pendente."
+            )
+
+        elif n == 1:
+            mensagem = (
+                "1 tarefa pendente."
+            )
+
+        else:
+            mensagem = (
+                f"{n} tarefas pendentes."
+            )
+
+
+        ctk.CTkLabel(
+            body,
+
+            text=mensagem,
+
+            text_color=self.colors[
+                "text"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+            ),
+
+        ).pack(
+            pady=(9, 0),
+        )
+
+
+        if n_hoje:
+            hoje_texto = (
+                "1 para hoje."
+                if n_hoje == 1
+                else
+                f"{n_hoje} para hoje."
+            )
+
+            ctk.CTkLabel(
+                body,
+
+                text=hoje_texto,
+
+                text_color=self.colors[
+                    "dim"
+                ],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                ),
+
+            ).pack(
+                pady=(2, 0),
+            )
+
+
         if streak:
-            lines.append(f"{streak} concluida(s) hoje!")
-        msg = "\n".join(lines)
+            streak_texto = (
+                "1 concluída hoje"
+                if streak == 1
+                else
+                f"{streak} concluídas hoje"
+            )
 
-        tk.Label(p, text=msg, bg=C["panel"], fg=C["text"],
-                  font=("Consolas", 8), pady=10, padx=12,
-                  justify="center", wraplength=200).pack()
-        tk.Frame(p, bg=C["border"], height=1).pack(fill="x", padx=8)
+            ctk.CTkLabel(
+                body,
 
-        self._btn(
-            p,
+                text=streak_texto,
+
+                text_color=self.colors[
+                    "green"
+                ],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                ),
+
+            ).pack(
+                pady=(2, 0),
+            )
+
+
+        # ----------------------------------------------------
+        # ACOES
+        # ----------------------------------------------------
+
+        self._button(
+            parent,
+
             "Central do MARVIN",
+
             lambda: [
                 self._close(),
                 self.comp._open_home()
-            ]
+            ],
         )
 
+
         if n:
-            self._btn(p, "Ver tarefas",
-                       lambda: [self._close(),
-                                 TaskWindow(self.root, self.comp)])
+            self._button(
+                parent,
 
-        self._btn(p, "+ Nova tarefa",
-                   lambda: [self._close(),
-                             NewTaskWindow(self.root, self.comp)])
+                "Ver tarefas",
 
-        self._btn(p, "Agora nao", self._close, fg=C["dim"])
+                lambda: [
+                    self._close(),
+                    TaskWindow(
+                        self.root,
+                        self.comp
+                    )
+                ],
+            )
 
-    def _build_alert(self, p):
-        queue = self.comp._reminder_queue
-        task  = queue[0] if queue else None
-        name  = task[1] if task else "tarefa"
-        hora  = task[4][:5] if task else ""
-        tk.Label(p, text=f"Lembrete: {hora}",
-                  bg=C["panel"], fg=C["orange"],
-                  font=("Consolas", 8), pady=(6, 2), padx=12).pack()
-        tk.Label(p, text=name,
-                  bg=C["panel"], fg=C["text"],
-                  font=("Consolas", 9, "bold"), pady=(0, 8), padx=12,
-                  wraplength=200, justify="center").pack()
-        n_fila = len(queue)
+
+        self._button(
+            parent,
+
+            "+ Nova tarefa",
+
+            lambda: [
+                self._close(),
+                NewTaskWindow(
+                    self.root,
+                    self.comp
+                )
+            ],
+
+            accent=True,
+        )
+
+
+        agora_nao = ctk.CTkButton(
+            parent,
+
+            text="Agora não",
+
+            height=27,
+
+            corner_radius=6,
+
+            fg_color="transparent",
+
+            hover_color=self.colors[
+                "hover"
+            ],
+
+            text_color=self.colors[
+                "dim"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+            ),
+
+            command=self._close,
+        )
+
+        agora_nao.pack(
+            fill="x",
+            padx=14,
+            pady=(2, 11),
+        )
+
+
+    # ========================================================
+    # MODO ALERTA
+    # ========================================================
+
+    def _build_alert(
+        self,
+        parent,
+    ):
+
+        self._header(
+            parent
+        )
+
+
+        queue = (
+            self.comp
+            ._reminder_queue
+        )
+
+        task = (
+            queue[0]
+            if queue
+            else None
+        )
+
+        name = (
+            task[1]
+            if task
+            else "tarefa"
+        )
+
+        hora = (
+            task[4][:5]
+            if task
+            else ""
+        )
+
+
+        body = ctk.CTkFrame(
+            parent,
+            fg_color="transparent",
+        )
+
+        body.pack(
+            fill="x",
+            padx=14,
+            pady=(14, 10),
+        )
+
+
+        icon = ctk.CTkFrame(
+            body,
+
+            width=34,
+            height=34,
+
+            corner_radius=17,
+
+            fg_color=self.colors[
+                "orange_bg"
+            ],
+
+            border_width=1,
+            border_color=self.colors[
+                "accent"
+            ],
+        )
+
+        icon.pack()
+
+        icon.pack_propagate(
+            False
+        )
+
+
+        ctk.CTkLabel(
+            icon,
+
+            text="!",
+
+            text_color=self.colors[
+                "accent"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=14,
+                weight="bold",
+            ),
+
+        ).place(
+            relx=0.5,
+            rely=0.5,
+            anchor="center",
+        )
+
+
+        ctk.CTkLabel(
+            body,
+
+            text=(
+                f"Lembrete · {hora}"
+                if hora
+                else "Lembrete"
+            ),
+
+            text_color=self.colors[
+                "accent"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+        ).pack(
+            pady=(8, 3),
+        )
+
+
+        ctk.CTkLabel(
+            body,
+
+            text=name,
+
+            text_color=self.colors[
+                "text"
+            ],
+
+            wraplength=190,
+
+            justify="center",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+
+        ).pack()
+
+
+        n_fila = len(
+            queue
+        )
+
+
         if n_fila > 1:
-            tk.Label(p, text=f"+{n_fila - 1} lembrete(s) na fila",
-                      bg=C["panel"], fg=C["dim"],
-                      font=("Consolas", 7), pady=2).pack()
-        tk.Frame(p, bg=C["border"], height=1).pack(fill="x", padx=8)
-        self._btn(p, "Concluir",
-                   lambda: [self._close(), self.comp.complete_task()],
-                   fg=C["green"])
-        self._btn(p, "Adiar",
-                   lambda: [self._close(),
-                             SnoozeWindow(self.root, self.comp, task)])
-        self._btn(p, "Ver tarefas",
-                   lambda: [self._close(),
-                             TaskWindow(self.root, self.comp)])
+            ctk.CTkLabel(
+                body,
+
+                text=(
+                    f"+{n_fila - 1} "
+                    "lembrete(s) na fila"
+                ),
+
+                text_color=self.colors[
+                    "dim"
+                ],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=8,
+                ),
+
+            ).pack(
+                pady=(4, 0),
+            )
+
+
+        self._button(
+            parent,
+
+            "Concluir",
+
+            lambda: [
+                self._close(),
+                self.comp.complete_task()
+            ],
+
+            accent=True,
+        )
+
+
+        self._button(
+            parent,
+
+            "Adiar",
+
+            lambda: [
+                self._close(),
+                SnoozeWindow(
+                    self.root,
+                    self.comp,
+                    task
+                )
+            ],
+        )
+
+
+        self._button(
+            parent,
+
+            "Ver tarefas",
+
+            lambda: [
+                self._close(),
+                TaskWindow(
+                    self.root,
+                    self.comp
+                )
+            ],
+        )
+
+
+        ctk.CTkFrame(
+            parent,
+            height=7,
+            fg_color="transparent",
+        ).pack()
 
 
 class SnoozeWindow:
@@ -2742,6 +5381,7 @@ class NotifPopup:
 
 #  PERSONAGEM PRINCIPAL — MARVIN
 
+
 class MarvinCompanion:
     W, H = 180, 260
 
@@ -2878,7 +5518,7 @@ class MarvinCompanion:
         self.cv.bind("<B1-Motion>",       self._drag_move)
         self.cv.bind("<ButtonRelease-1>", self._drag_end)
         self.cv.bind("<Button-3>",        self._show_menu)
-    
+
         self.root.protocol("WM_DELETE_WINDOW", self._hide_marvin)
         self.root.bind_all("<Control-Shift-N>",
                             lambda e: NewTaskWindow(self.root, self))
