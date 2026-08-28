@@ -1197,7 +1197,7 @@ class NewTaskWindow:
 
         ctk.CTkLabel(
             marca,
-            text="✦",
+            text="",
             text_color="#FFFFFF",
             font=ctk.CTkFont(
                 size=9,
@@ -3296,8 +3296,19 @@ class EditTaskWindow:
         self.tid      = tid
         self.callback = callback
         row = db_obter(tid)
+
         if not row:
+            messagebox.showwarning(
+                "MARVIN",
+                (
+                    "Esta tarefa nao foi encontrada.\n\n"
+                    "Ela pode ter sido excluida ou alterada "
+                    "por outra janela."
+                ),
+                parent=parent
+            )
             return
+
         texto, desc, data, hora, rep, prioridade = row
         self.win = _make_win(parent, "Editar Tarefa", 400, 415)
         self.win.grab_set()
@@ -3631,29 +3642,531 @@ class WaitingPhrasesWindow:
 #  JANELA: CONFIGURACOES
 
 class SettingsWindow:
+
+    WIDTH = 430
+    HEIGHT = 680
+
     def __init__(self, parent, companion):
         self.comp = companion
-        self.win  = _make_win(parent, "Configuracoes", 400, 730)
-        self.win.grab_set()
+
+        tema = cfg.get("tema", "escuro")
+
+        if tema == "claro":
+            self.colors = {
+                "bg": "#F9F8F6",
+                "card": "#FFFFFF",
+                "surface": "#F3F1ED",
+                "text": "#2C2C2A",
+                "dim": "#888780",
+                "border": "#E3E1DC",
+                "accent": "#D97757",
+                "accent_hover": "#C96844",
+                "danger_bg": "#FFF0E8",
+                "danger_fg": "#A85638",
+            }
+        else:
+            self.colors = {
+                "bg": "#1A1915",
+                "card": "#232220",
+                "surface": "#2C2B28",
+                "text": "#EFEDE8",
+                "dim": "#AAA79F",
+                "border": "#3B3935",
+                "accent": "#D97757",
+                "accent_hover": "#E18868",
+                "danger_bg": "#392820",
+                "danger_fg": "#E6A082",
+            }
+
+        self.win = ctk.CTkToplevel(parent)
+
+        self.win.withdraw()
+        self.win.overrideredirect(True)
+
+        self.win.geometry(
+            f"{self.WIDTH}x{self.HEIGHT}"
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self.win.transient(parent)
+
+        self._drag_x = 0
+        self._drag_y = 0
+
         self._build()
-        _position_near_marvin(self.win, self.comp)
+
+        self.win.update_idletasks()
+
+        _position_near_marvin(
+            self.win,
+            self.comp
+        )
+
+        self.win.deiconify()
+        self.win.lift()
+        self.win.grab_set()
+        self.win.focus_force()
+
+        self.win.bind(
+            "<Escape>",
+            lambda e: self.win.destroy()
+        )
+
+    # ==========================================================
+    # JANELA
+    # ==========================================================
+
+    def _drag_start(self, event):
+        self._drag_x = (
+            event.x_root
+            - self.win.winfo_x()
+        )
+
+        self._drag_y = (
+            event.y_root
+            - self.win.winfo_y()
+        )
+
+    def _drag_move(self, event):
+        x = event.x_root - self._drag_x
+        y = event.y_root - self._drag_y
+
+        self.win.geometry(
+            f"+{x}+{y}"
+        )
+
+    # ==========================================================
+    # COMPONENTES
+    # ==========================================================
+
+    def _section_title(
+        self,
+        parent,
+        texto
+    ):
+        ctk.CTkLabel(
+            parent,
+            text=texto.upper(),
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold"
+            )
+        ).pack(
+            fill="x",
+            pady=(18, 7)
+        )
+
+    def _toggle_row(
+        self,
+        parent,
+        titulo,
+        descricao,
+        variable
+    ):
+        row = ctk.CTkFrame(
+            parent,
+            fg_color="transparent"
+        )
+
+        row.pack(
+            fill="x",
+            padx=12,
+            pady=10
+        )
+
+        text_area = ctk.CTkFrame(
+            row,
+            fg_color="transparent"
+        )
+
+        text_area.pack(
+            side="left",
+            fill="x",
+            expand=True
+        )
+
+        ctk.CTkLabel(
+            text_area,
+            text=titulo,
+            text_color=self.colors["text"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=12,
+                weight="bold"
+            )
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkLabel(
+            text_area,
+            text=descricao,
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9
+            )
+        ).pack(
+            fill="x",
+            pady=(1, 0)
+        )
+
+        switch = ctk.CTkSwitch(
+            row,
+            text="",
+            variable=variable,
+            width=42,
+            progress_color=self.colors["accent"],
+            button_color=self.colors["card"],
+            button_hover_color=self.colors["accent_hover"]
+        )
+
+        switch.pack(
+            side="right",
+            padx=(12, 0)
+        )
+
+    def _slider_block(
+        self,
+        parent,
+        titulo,
+        variable,
+        from_,
+        to,
+        steps,
+        valor,
+        command
+    ):
+        block = ctk.CTkFrame(
+            parent,
+            fg_color="transparent"
+        )
+
+        block.pack(
+            fill="x",
+            pady=(0, 14)
+        )
+
+        top = ctk.CTkFrame(
+            block,
+            fg_color="transparent"
+        )
+
+        top.pack(
+            fill="x",
+            pady=(0, 7)
+        )
+
+        ctk.CTkLabel(
+            top,
+            text=titulo,
+            text_color=self.colors["text"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=12,
+                weight="bold"
+            )
+        ).pack(
+            side="left"
+        )
+
+        badge = ctk.CTkLabel(
+            top,
+            text=valor,
+            width=50,
+            height=24,
+            corner_radius=7,
+            fg_color=self.colors["surface"],
+            text_color=self.colors["accent"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold"
+            )
+        )
+
+        badge.pack(
+            side="right"
+        )
+
+        slider = ctk.CTkSlider(
+            block,
+            variable=variable,
+            from_=from_,
+            to=to,
+            number_of_steps=steps,
+            fg_color=self.colors["border"],
+            progress_color=self.colors["accent"],
+            button_color=self.colors["card"],
+            button_hover_color=self.colors["accent_hover"],
+            height=18,
+            command=lambda value: command(
+                value,
+                badge
+            )
+        )
+
+        slider.pack(
+            fill="x"
+        )
+
+    # ==========================================================
+    # CALLBACKS VISUAIS
+    # ==========================================================
+
+    def _tema_visual_changed(self, valor):
+        if valor == "Claro":
+            self.v_tema.set("claro")
+        else:
+            self.v_tema.set("escuro")
+
+    def _size_normal_changed(
+        self,
+        value,
+        badge
+    ):
+        value = int(
+            round(float(value) / 5) * 5
+        )
+
+        badge.configure(
+            text=str(value)
+        )
+
+        self._preview_size(
+            "tamanho_normal",
+            value
+        )
+
+    def _size_compact_changed(
+        self,
+        value,
+        badge
+    ):
+        value = int(
+            round(float(value) / 5) * 5
+        )
+
+        badge.configure(
+            text=str(value)
+        )
+
+        self._preview_size(
+            "tamanho_compacto",
+            value
+        )
+
+    def _opacity_changed(
+        self,
+        value,
+        badge
+    ):
+        value = round(
+            float(value),
+            2
+        )
+
+        badge.configure(
+            text=f"{value:.2f}"
+        )
+
+        self._preview_opacity(
+            value
+        )
+
+    # ==========================================================
+    # INTERFACE
+    # ==========================================================
 
     def _build(self):
-        w = self.win
-        _header(w, "Configuracoes")
-        body = tk.Frame(w, bg=C["win_bg"])
-        body.pack(fill="both", expand=True, padx=20, pady=14)
 
-        # Aparencia
-        tk.Label(
+        shell = ctk.CTkFrame(
+            self.win,
+            fg_color=self.colors["card"],
+            corner_radius=16,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=2,
+            pady=2
+        )
+
+        shell.grid_columnconfigure(
+            0,
+            weight=1
+        )
+
+        shell.grid_rowconfigure(
+            2,
+            weight=1
+        )
+
+        # ------------------------------------------------------
+        # TITLEBAR
+        # ------------------------------------------------------
+
+        titlebar = ctk.CTkFrame(
+            shell,
+            height=48,
+            corner_radius=0,
+            fg_color="transparent"
+        )
+
+        titlebar.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=12,
+            pady=(4, 0)
+        )
+
+        titlebar.pack_propagate(False)
+
+        mark = ctk.CTkLabel(
+            titlebar,
+            text="",
+            text_color=self.colors["accent"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=15,
+                weight="bold"
+            )
+        )
+
+        mark.pack(
+            side="left",
+            padx=(5, 8)
+        )
+
+        titulo = ctk.CTkLabel(
+            titlebar,
+            text="MARVIN — CONFIGURAÇÕES",
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold"
+            )
+        )
+
+        titulo.pack(
+            side="left"
+        )
+
+        fechar = ctk.CTkButton(
+            titlebar,
+            text="×",
+            width=32,
+            height=32,
+            corner_radius=8,
+            fg_color="transparent",
+            hover_color=self.colors["surface"],
+            text_color=self.colors["dim"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=20
+            ),
+            command=self.win.destroy
+        )
+
+        fechar.pack(
+            side="right"
+        )
+
+        for widget in (
+            titlebar,
+            mark,
+            titulo
+        ):
+            widget.bind(
+                "<ButtonPress-1>",
+                self._drag_start
+            )
+
+            widget.bind(
+                "<B1-Motion>",
+                self._drag_move
+            )
+
+        ctk.CTkFrame(
+            shell,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors["border"]
+        ).grid(
+            row=1,
+            column=0,
+            sticky="ew"
+        )
+
+        # ------------------------------------------------------
+        # CONTEUDO
+        # ------------------------------------------------------
+
+        body = ctk.CTkScrollableFrame(
+            shell,
+            fg_color="transparent",
+            corner_radius=0,
+            scrollbar_button_color=self.colors["border"],
+            scrollbar_button_hover_color=self.colors["dim"]
+        )
+
+        body.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            padx=(18, 8),
+            pady=(14, 4)
+        )
+
+        ctk.CTkLabel(
             body,
-            text="Aparencia",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Segoe UI", 8, "bold")
-        ).pack(
+            text="Configurações",
+            text_color=self.colors["text"],
             anchor="w",
-            pady=(0, 5)
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=21,
+                weight="bold"
+            )
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkLabel(
+            body,
+            text="Personalize a aparência e o comportamento do MARVIN.",
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10
+            )
+        ).pack(
+            fill="x",
+            pady=(2, 2)
+        )
+
+        # ======================================================
+        # APARENCIA
+        # ======================================================
+
+        self._section_title(
+            body,
+            "Aparência"
         )
 
         self.v_tema = tk.StringVar(
@@ -3663,211 +4176,216 @@ class SettingsWindow:
             )
         )
 
-        tema_row = tk.Frame(
+        tema_card = ctk.CTkFrame(
             body,
-            bg=C["win_bg"]
+            fg_color=self.colors["surface"],
+            corner_radius=10,
+            border_width=1,
+            border_color=self.colors["border"]
         )
 
-        tema_row.pack(
+        tema_card.pack(
+            fill="x"
+        )
+
+        self.theme_selector = ctk.CTkSegmentedButton(
+            tema_card,
+            values=[
+                "Escuro",
+                "Claro"
+            ],
+            height=36,
+            fg_color=self.colors["surface"],
+            selected_color=self.colors["accent"],
+            selected_hover_color=self.colors["accent_hover"],
+            unselected_color=self.colors["surface"],
+            unselected_hover_color=self.colors["border"],
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold"
+            ),
+            command=self._tema_visual_changed
+        )
+
+        self.theme_selector.pack(
             fill="x",
-            pady=(0, 8)
+            padx=4,
+            pady=4
         )
 
-        for texto, valor in (
-            ("Escuro", "escuro"),
-            ("Claro", "claro"),
-        ):
-            tk.Radiobutton(
-                tema_row,
-                text=texto,
-                variable=self.v_tema,
-                value=valor,
-                bg=C["win_bg"],
-                fg=C["text"],
-                selectcolor=C["panel"],
-                activebackground=C["win_bg"],
-                activeforeground=C["text"],
-                font=("Segoe UI", 9),
-                cursor="hand2"
-            ).pack(
-                side="left",
-                padx=(0, 14)
+        if self.v_tema.get() == "claro":
+            self.theme_selector.set(
+                "Claro"
+            )
+        else:
+            self.theme_selector.set(
+                "Escuro"
             )
 
-        tk.Frame(
+        # ======================================================
+        # COMPORTAMENTO
+        # ======================================================
+
+        self._section_title(
             body,
-            bg=C["border"],
-            height=1
-        ).pack(
-            fill="x",
-            pady=(0, 10)
+            "Comportamento"
         )
 
-        # Som
-        self.v_som = tk.BooleanVar(value=cfg.get("som", True))
-        r2 = tk.Frame(body, bg=C["win_bg"])
-        r2.pack(fill="x", pady=4)
-        tk.Checkbutton(r2, variable=self.v_som,
-                        bg=C["win_bg"], selectcolor=C["panel"],
-                        activebackground=C["win_bg"],
-                        cursor="hand2").pack(side="left")
-        tk.Label(r2, text="Som ao receber lembrete",
-                  bg=C["win_bg"], fg=C["text"],
-                  font=("Consolas", 9)).pack(side="left")
+        self.v_som = tk.BooleanVar(
+            value=cfg.get(
+                "som",
+                True
+            )
+        )
 
-        # Iniciar MARVIN junto com o Windows
         self.v_startup = tk.BooleanVar(
             value=_startup_enabled()
         )
 
-        r_startup = tk.Frame(
+        behavior_card = ctk.CTkFrame(
             body,
-            bg=C["win_bg"]
+            fg_color=self.colors["surface"],
+            corner_radius=10,
+            border_width=1,
+            border_color=self.colors["border"]
         )
 
-        r_startup.pack(
+        behavior_card.pack(
+            fill="x"
+        )
+
+        self._toggle_row(
+            behavior_card,
+            "Som ao receber lembrete",
+            "Toca um aviso quando uma tarefa chegar.",
+            self.v_som
+        )
+
+        ctk.CTkFrame(
+            behavior_card,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors["border"]
+        ).pack(
             fill="x",
-            pady=4
+            padx=12
         )
 
-        tk.Checkbutton(
-            r_startup,
-            variable=self.v_startup,
-            bg=C["win_bg"],
-            selectcolor=C["panel"],
-            activebackground=C["win_bg"],
-            cursor="hand2"
-        ).pack(side="left")
+        self._toggle_row(
+            behavior_card,
+            "Iniciar com o Windows",
+            "Abre o MARVIN automaticamente ao entrar.",
+            self.v_startup
+        )
 
-        tk.Label(
-            r_startup,
-            text="Iniciar MARVIN com o Windows",
-            bg=C["win_bg"],
-            fg=C["text"],
-            font=("Consolas", 9)
-        ).pack(side="left")
+        # ======================================================
+        # TAMANHO
+        # ======================================================
 
-        # Tamanho dos sprites
-        tk.Frame(
+        self._section_title(
             body,
-            bg=C["border"],
-            height=1
-        ).pack(fill="x", pady=10)
-
-        tk.Label(
-            body,
-            text="Tamanho do MARVIN",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8, "bold")
-        ).pack(anchor="w")
+            "Tamanho e exibição"
+        )
 
         self.v_size_normal = tk.IntVar(
-            value=cfg.get("tamanho_normal", 100)
-        )
-
-        tk.Scale(
-            body,
-            variable=self.v_size_normal,
-            from_=60,
-            to=120,
-            resolution=5,
-            orient="horizontal",
-            bg=C["win_bg"],
-            fg=C["text"],
-            troughcolor=C["panel"],
-            highlightthickness=0,
-            activebackground=C["accent"],
-            command=lambda value: self._preview_size(
-                "tamanho_normal", value
+            value=cfg.get(
+                "tamanho_normal",
+                100
             )
-        ).pack(fill="x", pady=(0, 8))
-
-        tk.Label(
-            body,
-            text="Tamanho no modo compacto",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8, "bold")
-        ).pack(anchor="w")
+        )
 
         self.v_size_compact = tk.IntVar(
-            value=cfg.get("tamanho_compacto", 85)
+            value=cfg.get(
+                "tamanho_compacto",
+                85
+            )
         )
 
-        tk.Scale(
-            body,
-            variable=self.v_size_compact,
-            from_=60,
-            to=120,
-            resolution=5,
-            orient="horizontal",
-            bg=C["win_bg"],
-            fg=C["text"],
-            troughcolor=C["panel"],
-            highlightthickness=0,
-            activebackground=C["accent"],
-            command=lambda value: self._preview_size(
-                "tamanho_compacto", value
+        self.v_op = tk.DoubleVar(
+            value=cfg.get(
+                "opacidade",
+                1.0
             )
-        ).pack(fill="x", pady=(0, 8))
+        )
 
-        # Opacidade
-        tk.Frame(body, bg=C["border"], height=1).pack(fill="x", pady=10)
-        tk.Label(body, text="Opacidade do Marvin:",
-                  bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 8, "bold")).pack(anchor="w")
-        self.v_op = tk.DoubleVar(value=cfg.get("opacidade", 1.0))
-        tk.Scale(body, variable=self.v_op,
-                  from_=0.3, to=1.0, resolution=0.05,
-                  orient="horizontal",
-                  bg=C["win_bg"], fg=C["text"],
-                  troughcolor=C["panel"],
-                  highlightthickness=0,
-                  activebackground=C["accent"],
-                  command=self._preview_opacity
-                  ).pack(fill="x", pady=4)
-
-        # Frases personalizadas
-        tk.Frame(
+        self._slider_block(
             body,
-            bg=C["border"],
-            height=1
-        ).pack(fill="x", pady=8)
+            "Tamanho do MARVIN",
+            self.v_size_normal,
+            60,
+            120,
+            12,
+            str(self.v_size_normal.get()),
+            self._size_normal_changed
+        )
 
-        tk.Label(
+        self._slider_block(
             body,
-            text="Frases do MARVIN",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8, "bold")
-        ).pack(anchor="w")
+            "Modo compacto",
+            self.v_size_compact,
+            60,
+            120,
+            12,
+            str(self.v_size_compact.get()),
+            self._size_compact_changed
+        )
 
-        tk.Label(
+        self._slider_block(
             body,
-            text="Uma frase por linha. O MARVIN escolhe uma aleatoriamente.",
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 7)
-        ).pack(anchor="w", pady=(2, 5))
+            "Opacidade",
+            self.v_op,
+            0.3,
+            1.0,
+            14,
+            f"{self.v_op.get():.2f}",
+            self._opacity_changed
+        )
 
-        self.txt_frases = tk.Text(
+        # ======================================================
+        # FRASES
+        # ======================================================
+
+        self._section_title(
             body,
-            height=4,
-            bg=C["panel"],
-            fg=C["text"],
-            insertbackground=C["text"],
-            relief="flat",
-            bd=0,
-            padx=8,
-            pady=6,
-            font=("Consolas", 8),
+            "Frases do MARVIN"
+        )
+
+        ctk.CTkLabel(
+            body,
+            text=(
+                "Uma frase por linha. "
+                "O MARVIN escolhe uma aleatoriamente."
+            ),
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10
+            )
+        ).pack(
+            fill="x",
+            pady=(0, 6)
+        )
+
+        self.txt_frases = ctk.CTkTextbox(
+            body,
+            height=92,
+            corner_radius=9,
+            fg_color=self.colors["surface"],
+            text_color=self.colors["text"],
+            border_width=1,
+            border_color=self.colors["border"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11
+            ),
             wrap="word"
         )
 
         self.txt_frases.pack(
-            fill="x",
-            pady=(0, 4)
+            fill="x"
         )
 
         frases_atuais = cfg.get(
@@ -3875,64 +4393,150 @@ class SettingsWindow:
             _IDLE_MSGS
         )
 
-        if not isinstance(frases_atuais, list):
+        if not isinstance(
+            frases_atuais,
+            list
+        ):
             frases_atuais = _IDLE_MSGS
 
         self.txt_frases.insert(
             "1.0",
-            "\n".join(frases_atuais)
+            "\n".join(
+                frases_atuais
+            )
         )
 
-        tk.Button(
+        ctk.CTkButton(
             body,
             text="Personalizar frases de espera",
-            bg=C["panel"],
-            fg=C["accent"],
-            bd=0,
-            padx=10,
-            pady=6,
-            font=("Consolas", 8),
-            cursor="hand2",
-            activebackground=C["border"],
-            activeforeground=C["text"],
+            height=36,
+            corner_radius=8,
+            fg_color=self.colors["surface"],
+            hover_color=self.colors["border"],
+            border_width=1,
+            border_color=self.colors["border"],
+            text_color=self.colors["accent"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold"
+            ),
             command=lambda: WaitingPhrasesWindow(
                 self.win,
                 self.comp
             )
         ).pack(
-            anchor="w",
-            pady=(4, 0)
+            fill="x",
+            pady=(8, 0)
         )
 
-        # Limpeza
-        tk.Frame(body, bg=C["border"], height=1).pack(fill="x", pady=8)
-        tk.Button(body,
-                   text="  Limpar tarefas concluidas ha mais de 30 dias",
-                   bg=C["panel"], fg=C["dim"], bd=0,
-                   padx=10, pady=6, font=("Consolas", 8), cursor="hand2",
-                   activebackground=C["border"],
-                   activeforeground=C["text"],
-                   command=self._limpar).pack(anchor="w")
+        # ======================================================
+        # DADOS
+        # ======================================================
 
-        tk.Label(body, text=f"DB: {DB_F}",
-                  bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 7),
-                  wraplength=360).pack(anchor="w", pady=(8, 0))
-
-        tk.Button(
+        self._section_title(
             body,
-            text="Salvar e Fechar",
-            bg=C["green"],
-            fg=C["win_bg"],
-            bd=0,
+            "Dados"
+        )
+
+        ctk.CTkButton(
+            body,
+            text="Limpar tarefas concluídas há mais de 30 dias",
+            height=38,
+            corner_radius=8,
+            fg_color=self.colors["danger_bg"],
+            hover_color=self.colors["border"],
+            border_width=1,
+            border_color=self.colors["border"],
+            text_color=self.colors["danger_fg"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold"
+            ),
+            command=self._limpar
+        ).pack(
+            fill="x"
+        )
+
+        db_box = ctk.CTkFrame(
+            body,
+            fg_color=self.colors["surface"],
+            corner_radius=8,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+
+        db_box.pack(
+            fill="x",
+            pady=(8, 18)
+        )
+
+        ctk.CTkLabel(
+            db_box,
+            text=f"DB: {DB_F}",
+            text_color=self.colors["dim"],
+            anchor="w",
+            justify="left",
+            wraplength=350,
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9
+            )
+        ).pack(
+            fill="x",
             padx=10,
-            pady=9,
-            font=("Consolas", 9, "bold"),
-            cursor="hand2",
-            activebackground=C["accent"],
-            activeforeground=C["win_bg"],
+            pady=8
+        )
+
+        # ======================================================
+        # FOOTER
+        # ======================================================
+
+        footer = ctk.CTkFrame(
+            shell,
+            fg_color=self.colors["card"],
+            corner_radius=0
+        )
+
+        footer.grid(
+            row=3,
+            column=0,
+            sticky="ew"
+        )
+
+        ctk.CTkFrame(
+            footer,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors["border"]
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkButton(
+            footer,
+            text="Salvar alterações",
+            height=42,
+            corner_radius=9,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"],
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=12,
+                weight="bold"
+            ),
             command=self._salvar
-        ).pack(anchor="w", pady=10)
+        ).pack(
+            fill="x",
+            padx=18,
+            pady=12
+        )
+
+    # ==========================================================
+    # PREVIEWS
+    # ==========================================================
 
     def _preview_size(self, chave, valor):
         try:
@@ -3950,7 +4554,6 @@ class SettingsWindow:
                 f"[MARVIN] Erro ao atualizar tamanho: {exc}"
             )
 
-
     def _preview_opacity(self, valor):
         try:
             valor = float(valor)
@@ -3962,7 +4565,11 @@ class SettingsWindow:
             min(1.0, valor)
         )
 
-        cfg["opacidade"] = round(valor, 2)
+        cfg["opacidade"] = round(
+            valor,
+            2
+        )
+
         save_cfg(cfg)
 
         try:
@@ -3975,6 +4582,9 @@ class SettingsWindow:
                 f"[MARVIN] Erro ao alterar opacidade: {exc}"
             )
 
+    # ==========================================================
+    # SALVAR
+    # ==========================================================
 
     def _salvar(self):
         tema_anterior = cfg.get(
@@ -3984,8 +4594,12 @@ class SettingsWindow:
 
         cfg["tema"] = self.v_tema.get()
 
-        cfg["som"]          = self.v_som.get()
-        cfg["opacidade"]    = round(self.v_op.get(), 2)
+        cfg["som"] = self.v_som.get()
+
+        cfg["opacidade"] = round(
+            self.v_op.get(),
+            2
+        )
 
         cfg["tamanho_normal"] = int(
             self.v_size_normal.get()
@@ -4004,7 +4618,6 @@ class SettingsWindow:
             if linha.strip()
         ]
 
-        # Se apagar tudo, volta para as frases padrao.
         cfg["frases_idle"] = (
             frases
             if frases
@@ -4018,8 +4631,6 @@ class SettingsWindow:
             != cfg["tema"]
         )
 
-        # Ativa ou desativa a inicializacao
-        # automatica junto com o Windows.
         startup_ok = _set_startup_enabled(
             self.v_startup.get()
         )
@@ -4033,14 +4644,16 @@ class SettingsWindow:
         self.comp._reload_sprites()
 
         try:
-            self.comp.root.attributes("-alpha", cfg["opacidade"])
+            self.comp.root.attributes(
+                "-alpha",
+                cfg["opacidade"]
+            )
         except Exception:
             pass
+
         if tema_mudou:
             self.win.destroy()
 
-            # Reinicia o processo atual para que todas
-            # as janelas carreguem a nova paleta.
             os.execl(
                 sys.executable,
                 sys.executable,
@@ -4060,10 +4673,15 @@ class SettingsWindow:
 
     def _limpar(self):
         db_limpar_antigas(30)
-        self.comp.say("Limpeza concluida!", "talking", 2500)
+
+        self.comp.say(
+            "Limpeza concluida!",
+            "talking",
+            2500
+        )
+
         self.win.destroy()
 
-#  PAINEL FLUTUANTE (clique esquerdo)
 
 class InteractionPanel:
 
@@ -7786,15 +8404,31 @@ class MarvinCompanion:
 
         self._panel_open = True
 
-        panel = InteractionPanel(
-            self.root,
-            self,
-            mode="idle"
-        )
+        try:
+            panel = InteractionPanel(
+                self.root,
+                self,
+                mode="idle"
+            )
+
+        except Exception as exc:
+            # Se a criacao do painel falhar, libera
+            # imediatamente novos cliques no MARVIN.
+            self._panel_open = False
+
+            print(
+                f"[MARVIN] Erro ao abrir InteractionPanel: {exc}"
+            )
+
+            return
 
         panel.win.bind(
             "<Destroy>",
-            lambda e: setattr(self, "_panel_open", False)
+            lambda e: setattr(
+                self,
+                "_panel_open",
+                False
+            )
         )
 
     def _show_menu(self, e):
@@ -7811,27 +8445,99 @@ class MarvinCompanion:
         def loop():
             while True:
                 time.sleep(1)
-                now   = datetime.datetime.now()
+
+                now = datetime.datetime.now()
                 today = now.strftime("%Y-%m-%d")
+
                 try:
-                    rows = db_listar(apenas_pendentes=True)
-                except Exception:
+                    rows = db_listar(
+                        apenas_pendentes=True
+                    )
+                except Exception as exc:
+                    print(
+                        f"[MARVIN] Erro ao listar lembretes: {exc}"
+                    )
                     continue
+
                 for row in rows:
-                    tid, texto, desc, data, hora, rep, conc, lemb = row
+                    (
+                        tid,
+                        texto,
+                        desc,
+                        data,
+                        hora,
+                        rep,
+                        conc,
+                        lemb
+                    ) = row
+
                     if lemb:
                         continue
+
                     hora_s = hora[:5]
+
+                    # Valida primeiro a data original.
                     try:
-                        task_dt = datetime.datetime.strptime(
-                            f"{data} {hora_s}", "%Y-%m-%d %H:%M")
-                    except ValueError:
+                        data_original = (
+                            datetime.date.fromisoformat(data)
+                        )
+                    except (TypeError, ValueError):
                         continue
-                    diff = (now - task_dt).total_seconds()
+
+                    hoje_data = now.date()
+
+                    # Nenhuma recorrencia pode acontecer
+                    # antes da data em que foi criada/agendada.
+                    if hoje_data < data_original:
+                        continue
+
+                    # Tarefa unica usa exatamente sua data original.
+                    if rep == "Nunca":
+                        data_lembrete = data_original
+
+                    else:
+                        # Para recorrentes, primeiro verifica se
+                        # HOJE pertence ao calendario da recorrencia.
+                        if not self._should_remind(
+                            rep,
+                            data,
+                            now,
+                            today
+                        ):
+                            continue
+
+                        # O horario da ocorrencia recorrente deve
+                        # ser construido usando a data de HOJE,
+                        # e nao a data original da tarefa.
+                        data_lembrete = hoje_data
+
+                    try:
+                        hora_obj = datetime.datetime.strptime(
+                            hora_s,
+                            "%H:%M"
+                        ).time()
+                    except (TypeError, ValueError):
+                        continue
+
+                    task_dt = datetime.datetime.combine(
+                        data_lembrete,
+                        hora_obj
+                    )
+
+                    diff = (
+                        now - task_dt
+                    ).total_seconds()
+
                     if 0 <= diff < 90:
-                        if self._should_remind(rep, data, now, today):
-                            self.root.after(0, lambda r=row: self._enqueue(r))
-        threading.Thread(target=loop, daemon=True).start()
+                        self.root.after(
+                            0,
+                            lambda r=row: self._enqueue(r)
+                        )
+
+        threading.Thread(
+            target=loop,
+            daemon=True
+        ).start()
 
     def _should_remind(self, rep, data, now, today):
         if rep == "Nunca":

@@ -459,7 +459,7 @@ class HomeWindow:
 
         ctk.CTkLabel(
             mark,
-            text="✦",
+            text="",
             text_color="#FFFFFF",
             font=ctk.CTkFont(
                 size=10,
