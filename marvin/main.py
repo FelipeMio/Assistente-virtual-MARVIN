@@ -20,13 +20,13 @@ from .ui.home import abrir_home
 from marvin.database import (
     DB_F,
     db_listar,
+    db_listar_com_prioridade,
     db_criar,
     db_concluir,
     db_desconcluir,
     db_excluir,
     db_alterar,
     db_obter,
-    db_prioridade,
     db_marcar_lembrado,
     db_reset_lembrado,
     db_adiar,
@@ -2589,7 +2589,7 @@ class TaskWindow:
             widget.destroy()
 
 
-        rows = db_listar()
+        rows = db_listar_com_prioridade()
 
 
         filtro_status = (
@@ -2606,19 +2606,6 @@ class TaskWindow:
             .strip()
             .lower()
         )
-
-
-        prioridades = {
-            row[0]:
-                (
-                    db_prioridade(
-                        row[0]
-                    )
-                    or "Nenhuma"
-                )
-
-            for row in rows
-        }
 
 
         filtradas = []
@@ -2640,10 +2627,8 @@ class TaskWindow:
             )
 
             prioridade = (
-                prioridades.get(
-                    tid
-                )
-                or "Nenhuma"
+                row[8]
+                or "Normal"
             )
 
 
@@ -2833,14 +2818,12 @@ class TaskWindow:
             rep,
             concluida,
             lembrado,
+            prioridade,
         ) = row
 
-
         prioridade = (
-            db_prioridade(
-                tid
-            )
-            or "Nenhuma"
+            prioridade
+            or "Normal"
         )
 
 

@@ -141,6 +141,50 @@ def db_listar(apenas_pendentes=False):
         return cursor.fetchall()
 
 
+def db_listar_com_prioridade(
+    apenas_pendentes=False
+):
+    """
+    Listagem usada pelas interfaces que precisam
+    da prioridade junto com os dados da tarefa.
+
+    Mantem db_listar() inalterado com 8 campos.
+
+    Retorno:
+    id,texto,descricao,data,hora,recorrencia,
+    concluida,lembrado,prioridade
+    """
+    with _db_lock:
+        q = (
+            "SELECT "
+            "id,texto,descricao,data,hora,recorrencia,"
+            "concluida,lembrado,"
+            "CASE "
+            "WHEN prioridade IN ('Baixa','Normal','Alta') "
+            "THEN prioridade "
+            "ELSE 'Normal' "
+            "END "
+            "FROM tarefas WHERE ativo=1"
+        )
+
+        if apenas_pendentes:
+            q += " AND concluida=0"
+
+        q += (
+            " ORDER BY "
+            "CASE prioridade "
+            "WHEN 'Alta' THEN 0 "
+            "WHEN 'Normal' THEN 1 "
+            "WHEN 'Baixa' THEN 2 "
+            "ELSE 1 END, "
+            "data,hora"
+        )
+
+        cursor.execute(q)
+
+        return cursor.fetchall()
+
+
 def db_prioridade(tid):
     with _db_lock:
         cursor.execute(
