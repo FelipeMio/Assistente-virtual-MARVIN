@@ -32,9 +32,11 @@ RED = _THEME["red"]
 
 def _formatar_numero(valor):
     try:
-        return (
-            f"{int(valor):,}"
-            .replace(",", ".")
+        # QTDE representa quantidade de registros.
+        # Exibimos o inteiro exatamente como vem do dado,
+        # sem separador de milhar ou casas decimais.
+        return str(
+            int(valor)
         )
 
     except Exception:
