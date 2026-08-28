@@ -4187,6 +4187,27 @@ class SettingsWindow:
         value,
         badge
     ):
+        # Segunda camada da trava:
+        # impede alteracoes por scroll ou qualquer outro evento
+        # enquanto "Editar tamanho" estiver desmarcado.
+        if not bool(self.v_edit_size.get()):
+            atual = int(
+                cfg.get(
+                    "tamanho_normal",
+                    self.v_size_normal.get()
+                )
+            )
+
+            self.v_size_normal.set(
+                atual
+            )
+
+            badge.configure(
+                text=str(atual)
+            )
+
+            return
+
         value = int(
             round(float(value) / 5) * 5
         )
@@ -4210,6 +4231,24 @@ class SettingsWindow:
         value,
         badge
     ):
+        if not bool(self.v_edit_size.get()):
+            atual = int(
+                cfg.get(
+                    "tamanho_compacto",
+                    self.v_size_compact.get()
+                )
+            )
+
+            self.v_size_compact.set(
+                atual
+            )
+
+            badge.configure(
+                text=str(atual)
+            )
+
+            return
+
         value = int(
             round(float(value) / 5) * 5
         )
@@ -4233,6 +4272,24 @@ class SettingsWindow:
         value,
         badge
     ):
+        if not bool(self.v_edit_size.get()):
+            atual = float(
+                cfg.get(
+                    "opacidade",
+                    self.v_op.get()
+                )
+            )
+
+            self.v_op.set(
+                atual
+            )
+
+            badge.configure(
+                text=f"{atual:.2f}"
+            )
+
+            return
+
         value = round(
             float(value),
             2
