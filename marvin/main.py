@@ -6103,6 +6103,10 @@ class MarvinCompanion:
         self.state           = "thinking"
         self.bubble          = ""
         self.b_timer         = 0
+
+        # Controle de encerramento da thread de lembretes.
+        self._reminder_stop = threading.Event()
+        self._reminder_thread = None
         self._bubble_deadline = None
         self._reminder_queue = []
         self._panel_open     = False
@@ -8479,9 +8483,21 @@ class MarvinCompanion:
     # ── Lembretes ─────────────────────────────────────────────────────────────
 
     def _start_reminders(self):
+        # Evita criar duas threads de lembretes
+        # para a mesma instancia do MARVIN.
+        if (
+            self._reminder_thread is not None
+            and self._reminder_thread.is_alive()
+        ):
+            return
+
+        self._reminder_stop.clear()
+
         def loop():
-            while True:
-                time.sleep(1)
+            # Event.wait substitui time.sleep.
+            # Alem de esperar 1 segundo, ele acorda
+            # imediatamente quando o MARVIN e encerrado.
+            while not self._reminder_stop.wait(1.0):
 
                 now = datetime.datetime.now()
                 today = now.strftime("%Y-%m-%d")
@@ -8497,6 +8513,10 @@ class MarvinCompanion:
                     continue
 
                 for row in rows:
+
+                    if self._reminder_stop.is_set():
+                        break
+
                     (
                         tid,
                         texto,
@@ -8513,7 +8533,6 @@ class MarvinCompanion:
 
                     hora_s = hora[:5]
 
-                    # Valida primeiro a data original.
                     try:
                         data_original = (
                             datetime.date.fromisoformat(data)
@@ -8523,18 +8542,13 @@ class MarvinCompanion:
 
                     hoje_data = now.date()
 
-                    # Nenhuma recorrencia pode acontecer
-                    # antes da data em que foi criada/agendada.
                     if hoje_data < data_original:
                         continue
 
-                    # Tarefa unica usa exatamente sua data original.
                     if rep == "Nunca":
                         data_lembrete = data_original
 
                     else:
-                        # Para recorrentes, primeiro verifica se
-                        # HOJE pertence ao calendario da recorrencia.
                         if not self._should_remind(
                             rep,
                             data,
@@ -8543,9 +8557,6 @@ class MarvinCompanion:
                         ):
                             continue
 
-                        # O horario da ocorrencia recorrente deve
-                        # ser construido usando a data de HOJE,
-                        # e nao a data original da tarefa.
                         data_lembrete = hoje_data
 
                     try:
@@ -8565,16 +8576,25 @@ class MarvinCompanion:
                         now - task_dt
                     ).total_seconds()
 
-                    if 0 <= diff < 90:
-                        self.root.after(
-                            0,
-                            lambda r=row: self._enqueue(r)
-                        )
+                    if (
+                        0 <= diff < 90
+                        and not self._reminder_stop.is_set()
+                    ):
+                        try:
+                            self.root.after(
+                                0,
+                                lambda r=row: self._enqueue(r)
+                            )
+                        except tk.TclError:
+                            return
 
-        threading.Thread(
+        self._reminder_thread = threading.Thread(
             target=loop,
+            name="marvin-reminders",
             daemon=True
-        ).start()
+        )
+
+        self._reminder_thread.start()
 
     def _should_remind(self, rep, data, now, today):
         if rep == "Nunca":
@@ -8653,6 +8673,13 @@ class MarvinCompanion:
 
     def _on_close(self):
         """Encerra completamente o MARVIN."""
+
+        # Avisa imediatamente a thread de lembretes
+        # que o aplicativo esta sendo encerrado.
+        try:
+            self._reminder_stop.set()
+        except Exception:
+            pass
 
         try:
             if self._compact_mode:
