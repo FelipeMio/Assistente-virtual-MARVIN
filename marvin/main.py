@@ -2002,6 +2002,12 @@ class TaskWindow:
         self.status_buttons = {}
         self.priority_buttons = {}
 
+        # Controle de atualizacoes da lista.
+        # Evita reconstrucoes repetidas causadas por foco
+        # e por digitacao rapida na busca.
+        self._refresh_job = None
+        self._window_has_focus = False
+
         self._build()
 
         _position_near_marvin(
@@ -2016,7 +2022,12 @@ class TaskWindow:
 
         self.win.bind(
             "<FocusIn>",
-            lambda e: self._refresh()
+            self._on_focus_in
+        )
+
+        self.win.bind(
+            "<FocusOut>",
+            self._on_focus_out
         )
 
 
@@ -2050,6 +2061,105 @@ class TaskWindow:
         self.win.geometry(
             f"+{x}+{y}"
         )
+
+
+    # ========================================================
+    # CONTROLE DE REFRESH
+    # ========================================================
+
+    def _schedule_refresh(
+        self,
+        delay=140,
+    ):
+        """
+        Agenda apenas um refresh.
+
+        Se outro pedido chegar antes do tempo,
+        substitui o anterior.
+        """
+        try:
+            if not self.win.winfo_exists():
+                return
+        except Exception:
+            return
+
+        if self._refresh_job is not None:
+            try:
+                self.win.after_cancel(
+                    self._refresh_job
+                )
+            except Exception:
+                pass
+
+        self._refresh_job = self.win.after(
+            delay,
+            self._run_scheduled_refresh,
+        )
+
+
+    def _run_scheduled_refresh(self):
+        self._refresh_job = None
+        self._refresh()
+
+
+    def _on_focus_in(
+        self,
+        event,
+    ):
+        # FocusIn tambem e propagado quando o foco
+        # passa entre controles internos da janela.
+        #
+        # Atualizamos apenas quando a TaskWindow
+        # estava realmente sem foco antes.
+        if self._window_has_focus:
+            return
+
+        try:
+            if (
+                event.widget.winfo_toplevel()
+                is not self.win
+            ):
+                return
+        except Exception:
+            return
+
+        self._window_has_focus = True
+
+        # Pequeno atraso permite que a troca de
+        # janela/foco termine antes da atualizacao.
+        self._schedule_refresh(
+            80
+        )
+
+
+    def _on_focus_out(
+        self,
+        event,
+    ):
+        # Espera o Tk concluir a mudanca de foco.
+        # Assim, mover o foco entre dois controles
+        # da propria TaskWindow nao conta como sair.
+        try:
+            self.win.after_idle(
+                self._sync_focus_state
+            )
+        except Exception:
+            pass
+
+
+    def _sync_focus_state(self):
+        try:
+            foco = self.win.focus_get()
+
+            if (
+                foco is None
+                or foco.winfo_toplevel()
+                is not self.win
+            ):
+                self._window_has_focus = False
+
+        except Exception:
+            self._window_has_focus = False
 
 
     # ========================================================
@@ -2531,7 +2641,9 @@ class TaskWindow:
         self.busca.trace_add(
             "write",
             lambda *_:
-                self._refresh()
+                self._schedule_refresh(
+                    160
+                )
         )
 
 
@@ -2581,6 +2693,19 @@ class TaskWindow:
             "lf"
         ):
             return
+
+        # Um refresh imediato, por exemplo apos
+        # clicar em um filtro, invalida qualquer
+        # refresh que ainda estivesse aguardando.
+        if self._refresh_job is not None:
+            try:
+                self.win.after_cancel(
+                    self._refresh_job
+                )
+            except Exception:
+                pass
+
+            self._refresh_job = None
 
 
         for widget in (
