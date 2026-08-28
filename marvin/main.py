@@ -6103,6 +6103,7 @@ class MarvinCompanion:
         self.state           = "thinking"
         self.bubble          = ""
         self.b_timer         = 0
+        self._bubble_deadline = None
         self._reminder_queue = []
         self._panel_open     = False
         self._dragging       = False
@@ -7972,9 +7973,26 @@ class MarvinCompanion:
     # ── Fala ──────────────────────────────────────────────────────────────────
 
     def say(self, text, state="talking", duration=4000):
-        self.bubble  = text
-        self.state   = state
+        self.bubble = text
+        self.state = state
+
+        try:
+            duration = max(
+                0,
+                float(duration)
+            )
+        except (TypeError, ValueError):
+            duration = 0
+
         self.b_timer = duration
+
+        if duration > 0:
+            self._bubble_deadline = (
+                time.monotonic()
+                + duration / 1000.0
+            )
+        else:
+            self._bubble_deadline = None
 
     # ── Fila de lembretes ─────────────────────────────────────────────────────
 
@@ -8077,9 +8095,27 @@ class MarvinCompanion:
             self._yawn_index = 0
             self._yawn_last_frame = now
         if self.b_timer > 0:
-            self.b_timer -= 50
 
-            if self.b_timer <= 0:
+            # Usa relogio monotonic em vez de assumir
+            # que cada frame levou exatamente 50 ms.
+            if self._bubble_deadline is None:
+                self._bubble_deadline = (
+                    now
+                    + float(self.b_timer) / 1000.0
+                )
+
+            restante_ms = max(
+                0.0,
+                (
+                    self._bubble_deadline
+                    - now
+                ) * 1000.0
+            )
+
+            self.b_timer = restante_ms
+
+            if restante_ms <= 0:
+                self._bubble_deadline = None
 
                 # Nunca fecha automaticamente um lembrete.
                 if self._reminder_queue:
@@ -8087,6 +8123,7 @@ class MarvinCompanion:
 
                 # Baloes normais continuam fechando pelo tempo.
                 else:
+                    self.b_timer = 0
                     self.bubble = ""
                     self.state = "idle"
 
