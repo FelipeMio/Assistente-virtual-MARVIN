@@ -6001,6 +6001,24 @@ class NotifPopup:
 
 
 class MarvinCompanion:
+
+    # ========================================================
+    # TIMINGS
+    # ========================================================
+
+    REMINDER_POLL_SECONDS = 1.0
+    RECURRENT_REMINDER_RESET_MS = 95_000
+
+    BLINK_MIN_SECONDS = 3.0
+    BLINK_MAX_SECONDS = 6.0
+
+    YAWN_MIN_SECONDS = 45.0
+    YAWN_MAX_SECONDS = 90.0
+
+    ALERT_FRAME_SECONDS = 0.18
+    COMPACT_FRAME_SECONDS = 0.35
+
+    ANIMATION_TICK_MS = 50
     W, H = 180, 260
 
     COMPACT_W = 100
@@ -6061,11 +6079,11 @@ class MarvinCompanion:
         self._yawn_frames = self._load_yawn_frames()
 
         # Controle da piscada
-        self._next_blink = time.monotonic() + random.uniform(3.0, 6.0)
+        self._next_blink = time.monotonic() + random.uniform(self.BLINK_MIN_SECONDS, self.BLINK_MAX_SECONDS)
         self._blink_until = 0.0
 
         # Controle do bocejo
-        self._next_yawn = time.monotonic() + random.uniform(45.0,90.0)
+        self._next_yawn = time.monotonic() + random.uniform(self.YAWN_MIN_SECONDS, self.YAWN_MAX_SECONDS)
         self._yawn_index = 0
         self._yawn_last_frame = 0.0
         self._yawn_sequence = [0, 1, 1, 1, 0]
@@ -7322,7 +7340,7 @@ class MarvinCompanion:
         # Comeca uma piscada nova
         if now >= self._next_blink and now >= self._blink_until:
             self._blink_until = now + 0.14
-            self._next_blink = now + random.uniform(3.0, 6.0)
+            self._next_blink = now + random.uniform(self.BLINK_MIN_SECONDS, self.BLINK_MAX_SECONDS)
 
         # Frame 02 enquanto estiver piscando
         if (
@@ -7361,7 +7379,7 @@ class MarvinCompanion:
             self.state = "idle"
             self._next_yawn = (
                 time.monotonic()
-                + random.uniform(45.0, 90.0)
+                + random.uniform(self.YAWN_MIN_SECONDS, self.YAWN_MAX_SECONDS)
             )
             return self._draw_idle_sprite()
 
@@ -7382,7 +7400,7 @@ class MarvinCompanion:
             self._yawn_last_frame = 0.0
 
             self._next_yawn = (
-                now + random.uniform(45.0, 90.0)
+                now + random.uniform(self.YAWN_MIN_SECONDS, self.YAWN_MAX_SECONDS)
             )
 
             return self._draw_idle_sprite()
@@ -7439,7 +7457,7 @@ class MarvinCompanion:
         now = time.monotonic()
 
         # Troca de frame aproximadamente a cada 180 ms
-        if now - self._alert_last_frame >= 0.18:
+        if now - self._alert_last_frame >= self.ALERT_FRAME_SECONDS:
             self._alert_frame_index = (
                 self._alert_frame_index + 1
             ) % len(self._alert_frames)
@@ -7634,7 +7652,7 @@ class MarvinCompanion:
         now = time.monotonic()
 
         # 01 -> 02 -> 03 -> 02 -> ...
-        if now - self._compact_last_frame >= 0.35:
+        if now - self._compact_last_frame >= self.COMPACT_FRAME_SECONDS:
             self._compact_frame_index = (
                 self._compact_frame_index + 1
             ) % len(self._compact_sequence)
@@ -8080,7 +8098,7 @@ class MarvinCompanion:
         # Modo compacto: somente desenha os frames da cabeca.
         if self._compact_mode:
             self._draw_compact_sprite()
-            self.root.after(50, self._animate)
+            self.root.after(self.ANIMATION_TICK_MS, self._animate)
             return
 
         now = time.monotonic()
@@ -8181,7 +8199,7 @@ class MarvinCompanion:
                 hover=self._bubble_hover
             )
 
-        self.root.after(50, self._animate)
+        self.root.after(self.ANIMATION_TICK_MS, self._animate)
 
     # ── Drag ──────────────────────────────────────────────────────────────────
 
@@ -8497,7 +8515,7 @@ class MarvinCompanion:
             # Event.wait substitui time.sleep.
             # Alem de esperar 1 segundo, ele acorda
             # imediatamente quando o MARVIN e encerrado.
-            while not self._reminder_stop.wait(1.0):
+            while not self._reminder_stop.wait(self.REMINDER_POLL_SECONDS):
 
                 now = datetime.datetime.now()
                 today = now.strftime("%Y-%m-%d")
@@ -8628,7 +8646,7 @@ class MarvinCompanion:
         # Tarefas recorrentes podem ser lembradas novamente
         if rep != "Nunca":
             self.root.after(
-                95000,
+                self.RECURRENT_REMINDER_RESET_MS,
                 lambda i=tid: db_reset_lembrado(i)
             )
 
