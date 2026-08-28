@@ -11,7 +11,7 @@ except ImportError:
     pystray = None
 
 from .config import load_cfg, save_cfg
-from .theme import get_palette
+from .theme import get_palette, get_modern_palette
 
 from .extension_loader import carregar_extensoes
 from .checklist import abrir_checklist
@@ -868,63 +868,7 @@ class NewTaskWindow:
             "escuro",
         )
 
-        if self.tema == "claro":
-            self.colors = {
-                "bg": "#F9F8F6",
-                "card": "#FFFFFF",
-                "text": "#2C2C2A",
-                "dim": "#888780",
-                "border": "#E3E1DC",
-
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-
-                "input": "#FFFFFF",
-                "input_hover": "#F6F4EF",
-
-                "high_bg": "#FAE7E5",
-                "high_fg": "#A33A32",
-
-                "normal_bg": "#FFF0D9",
-                "normal_fg": "#9A6424",
-
-                "low_bg": "#E7F3EA",
-                "low_fg": "#39734A",
-
-                "none_bg": "#F1EFE8",
-                "none_fg": "#6F6D67",
-
-                "error": "#C54B45",
-            }
-
-        else:
-            self.colors = {
-                "bg": "#1A1915",
-                "card": "#232220",
-                "text": "#EFEDE8",
-                "dim": "#85837D",
-                "border": "#34332F",
-
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-
-                "input": "#232220",
-                "input_hover": "#2C2B28",
-
-                "high_bg": "#482522",
-                "high_fg": "#F19A91",
-
-                "normal_bg": "#49351F",
-                "normal_fg": "#E8B86D",
-
-                "low_bg": "#20382A",
-                "low_fg": "#83C995",
-
-                "none_bg": "#2C2C2A",
-                "none_fg": "#B4B2A9",
-
-                "error": "#F08078",
-            }
+        self.colors = get_modern_palette(self.tema, "task_form")
 
         ctk.set_appearance_mode(
             "Light"
@@ -1263,16 +1207,19 @@ class NewTaskWindow:
         # BODY
         # ====================================================
 
-        body = ctk.CTkFrame(
+        body = ctk.CTkScrollableFrame(
             shell,
             fg_color="transparent",
+            corner_radius=0,
+            scrollbar_button_color=self.colors["border"],
+            scrollbar_button_hover_color=self.colors["dim"],
         )
 
         body.pack(
             fill="both",
             expand=True,
-            padx=20,
-            pady=(16, 12),
+            padx=(20, 8),
+            pady=(16, 8),
         )
 
 
@@ -1699,13 +1646,28 @@ class NewTaskWindow:
         # ====================================================
 
         footer = ctk.CTkFrame(
-            body,
-            fg_color="transparent",
+            shell,
+            fg_color=self.colors["card"],
         )
 
+        # O footer precisa ser reservado antes da area expansivel.
+        # Reempacotamos o body depois dele para garantir que
+        # Salvar/Cancelar nunca saiam da janela.
         footer.pack(
+            side="bottom",
             fill="x",
-            pady=(6, 0),
+            padx=20,
+            pady=(4, 12),
+        )
+
+        body.pack_forget()
+
+        body.pack(
+            side="top",
+            fill="both",
+            expand=True,
+            padx=(20, 8),
+            pady=(16, 8),
         )
 
 
@@ -1988,67 +1950,7 @@ class TaskWindow:
             "escuro"
         )
 
-        if self.tema == "claro":
-            self.colors = {
-                "bg": "#F9F8F6",
-                "card": "#FFFFFF",
-                "text": "#2C2C2A",
-                "dim": "#888780",
-                "border": "#E3E1DC",
-
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-
-                "hover": "#F1EFE8",
-
-                "high_bg": "#FAE7E5",
-                "high_fg": "#A33A32",
-
-                "medium_bg": "#FFF0D9",
-                "medium_fg": "#9A6424",
-
-                "low_bg": "#E7F3EA",
-                "low_fg": "#39734A",
-
-                "none_bg": "#F1EFE8",
-                "none_fg": "#6F6D67",
-
-                "done_bg": "#E1F5EE",
-                "done_fg": "#238A57",
-
-                "red": "#C54B45",
-            }
-
-        else:
-            self.colors = {
-                "bg": "#1A1915",
-                "card": "#232220",
-                "text": "#EFEDE8",
-                "dim": "#85837D",
-                "border": "#34332F",
-
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-
-                "hover": "#2C2B28",
-
-                "high_bg": "#482522",
-                "high_fg": "#F19A91",
-
-                "medium_bg": "#49351F",
-                "medium_fg": "#E8B86D",
-
-                "low_bg": "#20382A",
-                "low_fg": "#83C995",
-
-                "none_bg": "#2C2C2A",
-                "none_fg": "#B4B2A9",
-
-                "done_bg": "#04342C",
-                "done_fg": "#5DCAA5",
-
-                "red": "#F08078",
-            }
+        self.colors = get_modern_palette(self.tema, "task_list")
 
         ctk.set_appearance_mode(
             "Light"
@@ -3651,32 +3553,7 @@ class SettingsWindow:
 
         tema = cfg.get("tema", "escuro")
 
-        if tema == "claro":
-            self.colors = {
-                "bg": "#F9F8F6",
-                "card": "#FFFFFF",
-                "surface": "#F3F1ED",
-                "text": "#2C2C2A",
-                "dim": "#888780",
-                "border": "#E3E1DC",
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-                "danger_bg": "#FFF0E8",
-                "danger_fg": "#A85638",
-            }
-        else:
-            self.colors = {
-                "bg": "#1A1915",
-                "card": "#232220",
-                "surface": "#2C2B28",
-                "text": "#EFEDE8",
-                "dim": "#AAA79F",
-                "border": "#3B3935",
-                "accent": "#D97757",
-                "accent_hover": "#E18868",
-                "danger_bg": "#392820",
-                "danger_fg": "#E6A082",
-            }
+        self.colors = get_modern_palette(tema, "settings")
 
         self.win = ctk.CTkToplevel(parent)
 
@@ -3919,6 +3796,17 @@ class SettingsWindow:
             fill="x"
         )
 
+        # CustomTkinter nao rola o CTkScrollableFrame quando
+        # o cursor esta sobre um CTkSlider.
+        # Redirecionamos esse evento para o scroll da pagina.
+        slider.bind(
+            "<MouseWheel>",
+            self._scroll_settings_from_control,
+            add="+"
+        )
+
+        return slider
+
     # ==========================================================
     # CALLBACKS VISUAIS
     # ==========================================================
@@ -3928,6 +3816,371 @@ class SettingsWindow:
             self.v_tema.set("claro")
         else:
             self.v_tema.set("escuro")
+
+    def _toggle_size_edit(self):
+        """
+        Os controles de tamanho so podem ser alterados
+        quando 'Editar tamanho' estiver marcado.
+        """
+
+        enabled = bool(
+            self.v_edit_size.get()
+        )
+
+        state = (
+            "normal"
+            if enabled
+            else "disabled"
+        )
+
+        for slider in (
+            getattr(
+                self,
+                "size_normal_slider",
+                None
+            ),
+            getattr(
+                self,
+                "size_compact_slider",
+                None
+            ),
+            getattr(
+                self,
+                "opacity_slider",
+                None
+            ),
+        ):
+            if slider is None:
+                continue
+
+            slider.configure(
+                state=state,
+                progress_color=(
+                    self.colors["accent"]
+                    if enabled
+                    else self.colors["border"]
+                ),
+                button_color=(
+                    self.colors["card"]
+                    if enabled
+                    else self.colors["surface"]
+                ),
+                button_hover_color=(
+                    self.colors["accent_hover"]
+                    if enabled
+                    else self.colors["surface"]
+                )
+            )
+
+        if (
+            not enabled
+            and hasattr(
+                self,
+                "size_preview_image_label"
+            )
+        ):
+            self._clear_size_preview()
+
+
+    def _clear_size_preview(self):
+        """
+        Limpa a demonstracao visual dos tamanhos.
+        """
+
+        if not hasattr(
+            self,
+            "size_preview_image_label"
+        ):
+            return
+
+        self._size_preview_photo = None
+
+        self.size_preview_image_label.configure(
+            image=None,
+            text=(
+                "Mova um dos controles de tamanho "
+                "para visualizar."
+            )
+        )
+
+        self.size_preview_title.configure(
+            text="Prévia — ajuste um tamanho"
+        )
+
+
+    def _update_size_preview(
+        self,
+        modo,
+        valor
+    ):
+        """
+        Mostra nas Configuracoes uma demonstracao do
+        tamanho real do MARVIN sem trocar o modo atual.
+        """
+
+        if not bool(
+            self.v_edit_size.get()
+        ):
+            return
+
+        try:
+            percentual = int(
+                round(float(valor))
+            )
+        except (TypeError, ValueError):
+            return
+
+        percentual = max(
+            60,
+            min(120, percentual)
+        )
+
+        base = (
+            Path(__file__)
+            .resolve()
+            .parent
+            / "assets"
+            / "marvin"
+        )
+
+        try:
+
+            # ==================================================
+            # MODO NORMAL
+            # Mesma regra do MARVIN:
+            # 150 px no tamanho 100%.
+            # ==================================================
+
+            if modo == "normal":
+
+                arquivo = (
+                    base
+                    / "idle"
+                    / "01.png"
+                )
+
+                if not arquivo.exists():
+                    raise FileNotFoundError(
+                        arquivo
+                    )
+
+                imagem = (
+                    Image.open(arquivo)
+                    .convert("RGBA")
+                )
+
+                tamanho = max(
+                    1,
+                    int(
+                        150
+                        * percentual
+                        / 100
+                    )
+                )
+
+                imagem = imagem.resize(
+                    (
+                        tamanho,
+                        tamanho
+                    ),
+                    Image.Resampling.NEAREST
+                )
+
+                titulo = (
+                    f"Prévia — Modo normal · "
+                    f"{percentual}%"
+                )
+
+
+            # ==================================================
+            # MODO COMPACTO
+            # Repete a mesma regra usada pelo carregador real:
+            # crop comum + limite de 92x64.
+            # ==================================================
+
+            elif modo == "compact":
+
+                pasta = (
+                    base
+                    / "compact"
+                )
+
+                arquivos = [
+                    pasta / "01.png",
+                    pasta / "02.png",
+                    pasta / "03.png",
+                ]
+
+                imagens = []
+
+                for arquivo in arquivos:
+                    if arquivo.exists():
+                        imagens.append(
+                            Image.open(
+                                arquivo
+                            ).convert("RGBA")
+                        )
+
+                if not imagens:
+                    raise FileNotFoundError(
+                        pasta
+                    )
+
+                caixas = []
+
+                for img in imagens:
+                    bbox = (
+                        img
+                        .getchannel("A")
+                        .getbbox()
+                    )
+
+                    if bbox:
+                        caixas.append(
+                            bbox
+                        )
+
+                if not caixas:
+                    return
+
+                left = min(
+                    b[0]
+                    for b in caixas
+                )
+
+                top = min(
+                    b[1]
+                    for b in caixas
+                )
+
+                right = max(
+                    b[2]
+                    for b in caixas
+                )
+
+                bottom = max(
+                    b[3]
+                    for b in caixas
+                )
+
+                crop_box = (
+                    left,
+                    top,
+                    right,
+                    bottom
+                )
+
+                largura = (
+                    right
+                    - left
+                )
+
+                altura = (
+                    bottom
+                    - top
+                )
+
+                escala_config = (
+                    percentual
+                    / 100.0
+                )
+
+                max_w = max(
+                    1,
+                    int(
+                        92
+                        * escala_config
+                    )
+                )
+
+                max_h = max(
+                    1,
+                    int(
+                        64
+                        * escala_config
+                    )
+                )
+
+                escala = min(
+                    max_w / largura,
+                    max_h / altura
+                )
+
+                novo_w = max(
+                    1,
+                    int(
+                        largura
+                        * escala
+                    )
+                )
+
+                novo_h = max(
+                    1,
+                    int(
+                        altura
+                        * escala
+                    )
+                )
+
+                imagem = (
+                    imagens[0]
+                    .crop(crop_box)
+                    .resize(
+                        (
+                            novo_w,
+                            novo_h
+                        ),
+                        Image.Resampling.NEAREST
+                    )
+                )
+
+                titulo = (
+                    f"Prévia — Modo compacto · "
+                    f"{percentual}%"
+                )
+
+            else:
+                return
+
+
+            # ==================================================
+            # MOSTRA A IMAGEM
+            # ==================================================
+
+            self._size_preview_photo = (
+                ImageTk.PhotoImage(
+                    imagem,
+                    master=self.win
+                )
+            )
+
+            self.size_preview_image_label.configure(
+                image=self._size_preview_photo,
+                text=""
+            )
+
+            self.size_preview_title.configure(
+                text=titulo
+            )
+
+        except Exception as exc:
+
+            self._size_preview_photo = None
+
+            self.size_preview_image_label.configure(
+                image=None,
+                text="Não foi possível carregar a prévia."
+            )
+
+            self.size_preview_title.configure(
+                text="Prévia"
+            )
+
+            print(
+                "[MARVIN] Erro na previa de tamanho: "
+                f"{exc}"
+            )
+
 
     def _size_normal_changed(
         self,
@@ -3947,6 +4200,11 @@ class SettingsWindow:
             value
         )
 
+        self._update_size_preview(
+            "normal",
+            value
+        )
+
     def _size_compact_changed(
         self,
         value,
@@ -3962,6 +4220,11 @@ class SettingsWindow:
 
         self._preview_size(
             "tamanho_compacto",
+            value
+        )
+
+        self._update_size_preview(
+            "compact",
             value
         )
 
@@ -4123,6 +4386,10 @@ class SettingsWindow:
             scrollbar_button_color=self.colors["border"],
             scrollbar_button_hover_color=self.colors["dim"]
         )
+
+        # Usado para redirecionar a roda do mouse dos sliders
+        # para a rolagem vertical das Configuracoes.
+        self._settings_scroll = body
 
         body.grid(
             row=2,
@@ -4310,7 +4577,43 @@ class SettingsWindow:
             )
         )
 
-        self._slider_block(
+
+        # ------------------------------------------------------
+        # PROTECAO DOS CONTROLES DE TAMANHO
+        # ------------------------------------------------------
+
+        self.v_edit_size = tk.BooleanVar(
+            value=False
+        )
+
+        self.edit_size_check = ctk.CTkCheckBox(
+            body,
+            text="Editar tamanho",
+            variable=self.v_edit_size,
+            onvalue=True,
+            offvalue=False,
+            command=self._toggle_size_edit,
+            height=26,
+            checkbox_width=18,
+            checkbox_height=18,
+            corner_radius=5,
+            border_width=1,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"],
+            border_color=self.colors["border"],
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11
+            )
+        )
+
+        self.edit_size_check.pack(
+            fill="x",
+            pady=(0, 12)
+        )
+
+        self.size_normal_slider = self._slider_block(
             body,
             "Tamanho do MARVIN",
             self.v_size_normal,
@@ -4321,7 +4624,7 @@ class SettingsWindow:
             self._size_normal_changed
         )
 
-        self._slider_block(
+        self.size_compact_slider = self._slider_block(
             body,
             "Modo compacto",
             self.v_size_compact,
@@ -4332,7 +4635,80 @@ class SettingsWindow:
             self._size_compact_changed
         )
 
-        self._slider_block(
+        # ------------------------------------------------------
+        # PREVIA DE TAMANHO
+        # ------------------------------------------------------
+
+        self.size_preview_card = ctk.CTkFrame(
+            body,
+            fg_color=self.colors["surface"],
+            corner_radius=10,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+
+        self.size_preview_card.pack(
+            fill="x",
+            pady=(12, 6)
+        )
+
+        self.size_preview_title = ctk.CTkLabel(
+            self.size_preview_card,
+            text="Prévia — ajuste um tamanho",
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold"
+            )
+        )
+
+        self.size_preview_title.pack(
+            fill="x",
+            padx=14,
+            pady=(10, 4)
+        )
+
+        self.size_preview_area = ctk.CTkFrame(
+            self.size_preview_card,
+            height=210,
+            fg_color=self.colors["card"],
+            corner_radius=8,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+
+        self.size_preview_area.pack(
+            fill="x",
+            padx=12,
+            pady=(4, 12)
+        )
+
+        self.size_preview_area.pack_propagate(
+            False
+        )
+
+        self.size_preview_image_label = ctk.CTkLabel(
+            self.size_preview_area,
+            text=(
+                "Mova um dos controles de tamanho "
+                "para visualizar."
+            ),
+            text_color=self.colors["dim"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10
+            )
+        )
+
+        self.size_preview_image_label.pack(
+            expand=True
+        )
+
+        self._size_preview_photo = None
+
+        self.opacity_slider = self._slider_block(
             body,
             "Opacidade",
             self.v_op,
@@ -4342,6 +4718,10 @@ class SettingsWindow:
             f"{self.v_op.get():.2f}",
             self._opacity_changed
         )
+
+        # Os tres controles ja existem neste ponto.
+        # Aplicamos a trava somente agora.
+        self._toggle_size_edit()
 
         # ======================================================
         # FRASES
@@ -4535,6 +4915,56 @@ class SettingsWindow:
         )
 
     # ==========================================================
+    # SCROLL
+    # ==========================================================
+
+    def _scroll_settings_from_control(
+        self,
+        event
+    ):
+        """
+        Faz a roda do mouse sobre os sliders se comportar
+        exatamente como a rolagem normal das Configuracoes.
+        """
+
+        try:
+            canvas = getattr(
+                self._settings_scroll,
+                "_parent_canvas",
+                None
+            )
+
+            if canvas is None:
+                return "break"
+
+            delta = getattr(
+                event,
+                "delta",
+                0
+            )
+
+            if not delta:
+                return "break"
+
+            # Mesma formula usada internamente pelo
+            # CTkScrollableFrame no Windows.
+            unidades = -int(
+                delta / 6
+            )
+
+            if unidades:
+                canvas.yview(
+                    "scroll",
+                    unidades,
+                    "units"
+                )
+
+        except Exception:
+            pass
+
+        return "break"
+
+    # ==========================================================
     # PREVIEWS
     # ==========================================================
 
@@ -4702,43 +5132,7 @@ class InteractionPanel:
             "escuro",
         )
 
-        if self.tema == "claro":
-            self.colors = {
-                "bg": "#F9F8F6",
-                "card": "#FFFFFF",
-                "text": "#2C2C2A",
-                "dim": "#888780",
-                "border": "#E3E1DC",
-
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-
-                "green": "#238A57",
-                "green_bg": "#E1F5EE",
-
-                "orange_bg": "#FAECE7",
-
-                "hover": "#F1EFE8",
-            }
-
-        else:
-            self.colors = {
-                "bg": "#1A1915",
-                "card": "#232220",
-                "text": "#EFEDE8",
-                "dim": "#85837D",
-                "border": "#34332F",
-
-                "accent": "#D97757",
-                "accent_hover": "#C96844",
-
-                "green": "#5DCAA5",
-                "green_bg": "#04342C",
-
-                "orange_bg": "#4A1B0C",
-
-                "hover": "#2C2B28",
-            }
+        self.colors = get_modern_palette(self.tema, "interaction")
 
         ctk.set_appearance_mode(
             "Light"
