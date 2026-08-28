@@ -197,6 +197,62 @@ _MODERN_PALETTES = {
         },
     },
 
+    "home": {
+
+        "claro": {
+            "bg": "#F9F8F6",
+            "card": "#FFFFFF",
+            "text": "#2C2C2A",
+            "dim": "#888780",
+            "muted": "#A6A49D",
+            "border": "#E3E1DC",
+
+            # Mantem a identidade visual atual da Home clara.
+            "accent": "#46C5CE",
+            "accent_hover": "#C96844",
+
+            "button_hover": "#F1EFE8",
+
+            "tasks_bg": "#EEEDFE",
+            "tasks_fg": "#534AB7",
+
+            "check_bg": "#E1F5EE",
+            "check_fg": "#0F6E56",
+
+            "summary_bg": "#F1EFE8",
+            "summary_fg": "#5F5E5A",
+
+            "ext_bg": "#FAECE7",
+            "ext_fg": "#993C1D",
+        },
+
+        "escuro": {
+            "bg": "#1A1915",
+            "card": "#232220",
+            "text": "#EFEDE8",
+            "dim": "#85837D",
+            "muted": "#5F5E5A",
+            "border": "#302F2C",
+
+            "accent": "#D97757",
+            "accent_hover": "#C96844",
+
+            "button_hover": "#2C2B28",
+
+            "tasks_bg": "#26215C",
+            "tasks_fg": "#AFA9EC",
+
+            "check_bg": "#04342C",
+            "check_fg": "#5DCAA5",
+
+            "summary_bg": "#2C2C2A",
+            "summary_fg": "#B4B2A9",
+
+            "ext_bg": "#4A1B0C",
+            "ext_fg": "#F0997B",
+        },
+    },
+
     "interaction": {
 
         "claro": {
