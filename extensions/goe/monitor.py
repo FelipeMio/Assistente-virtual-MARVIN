@@ -69,28 +69,41 @@ def ler_status_goe(arquivo=None):
             "arquivo": str(arquivo),
         }
 
-    linha = linhas[-1]
+    leituras = []
 
     try:
-        data = _converter_data(
-            linha["DTREFERENCIA"]
-        )
+        for linha in linhas:
+            data = _converter_data(
+                linha["DTREFERENCIA"]
+            )
 
-        hora = int(
-            str(linha["HH"]).strip()
-        )
+            hora = int(
+                str(
+                    linha["HH"]
+                ).strip()
+            )
 
-        qtde_txt = str(
-            linha["QTDE"]
-        ).strip()
+            qtde_txt = str(
+                linha["QTDE"]
+            ).strip()
 
-        qtde_txt = (
-            qtde_txt
-            .replace(".", "")
-            .replace(",", "")
-        )
+            qtde_txt = (
+                qtde_txt
+                .replace(".", "")
+                .replace(",", "")
+            )
 
-        qtde = int(qtde_txt)
+            qtde = int(
+                qtde_txt
+            )
+
+            leituras.append({
+                "ok": True,
+                "data": data,
+                "hora": hora,
+                "qtde": qtde,
+                "arquivo": str(arquivo),
+            })
 
     except (
         KeyError,
@@ -106,28 +119,61 @@ def ler_status_goe(arquivo=None):
 
     agora = datetime.datetime.now()
 
-    hora_esperada = (
-        agora.replace(
-            minute=0,
-            second=0,
-            microsecond=0
-        )
+    inicio_hora_atual = agora.replace(
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+
+    hora_final_esperada = (
+        inicio_hora_atual
         - datetime.timedelta(hours=1)
     )
 
-    hora_csv = datetime.datetime.combine(
-        data,
-        datetime.time(hour=hora)
-    )
+    leitura_final = None
+    leitura_parcial = None
 
-    return {
-        "ok": True,
-        "data": data,
-        "hora": hora,
-        "qtde": qtde,
-        "atual": hora_csv == hora_esperada,
-        "arquivo": str(arquivo),
-    }
+    for leitura in leituras:
+        momento = datetime.datetime.combine(
+            leitura["data"],
+            datetime.time(
+                hour=leitura["hora"]
+            )
+        )
+
+        if momento == hora_final_esperada:
+            leitura_final = leitura
+
+        if momento == inicio_hora_atual:
+            leitura_parcial = leitura
+
+    # Mantemos compatibilidade com o restante
+    # da extensao:
+    #
+    # o status principal continua representando
+    # somente a ultima hora COMPLETA.
+    if leitura_final is not None:
+        status = dict(
+            leitura_final
+        )
+
+        status["atual"] = True
+
+    else:
+        # Ainda nao existe a hora completa esperada.
+        # Retornamos a leitura mais recente apenas
+        # como informacao historica/parcial.
+        status = dict(
+            leituras[-1]
+        )
+
+        status["atual"] = False
+
+    status["leituras"] = leituras
+    status["parcial"] = leitura_parcial
+    status["final"] = leitura_final
+
+    return status
 
 
 class GOEMonitor:
@@ -313,10 +359,22 @@ class GOEMonitor:
             # quando ja nao e mais a ultima hora completa.
             # -------------------------------------------------
             try:
-                registrar_leitura(
-                    status,
-                    exigir_atual=False,
-                )
+                # O CSV pode conter simultaneamente:
+                #
+                # - horas anteriores finalizadas;
+                # - a hora atual ainda parcial.
+                #
+                # Todas entram no dashboard.
+                # O alerta, porem, continua usando
+                # somente a ultima hora completa.
+                for leitura in status.get(
+                    "leituras",
+                    [status],
+                ):
+                    registrar_leitura(
+                        leitura,
+                        exigir_atual=False,
+                    )
 
             except Exception as exc:
                 print(
@@ -327,10 +385,22 @@ class GOEMonitor:
             # Resultado antigo pode entrar no historico,
             # mas nunca deve gerar alerta.
             if not status.get("atual"):
-                print(
-                    "[GOE] Leitura historica registrada: "
-                    f"{status.get('hora', 0):02d}h"
+                parcial = status.get(
+                    "parcial"
                 )
+
+                if parcial is not None:
+                    print(
+                        "[GOE] Parcial registrado: "
+                        f"{parcial.get('hora', 0):02d}h "
+                        f"-> {parcial.get('qtde', 0)} registros"
+                    )
+
+                else:
+                    print(
+                        "[GOE] Leitura historica registrada: "
+                        f"{status.get('hora', 0):02d}h"
+                    )
 
                 self._agendar()
                 return
