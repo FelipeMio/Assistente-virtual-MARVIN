@@ -5351,6 +5351,22 @@ class SettingsWindow:
         if tema_mudou:
             self.win.destroy()
 
+            # Para explicitamente o icone antigo da bandeja
+            # antes de substituir o processo.
+            tray_icon = getattr(
+                self.comp,
+                "_tray_icon",
+                None
+            )
+
+            if tray_icon is not None:
+                try:
+                    tray_icon.stop()
+                except Exception:
+                    pass
+                finally:
+                    self.comp._tray_icon = None
+
             os.execl(
                 sys.executable,
                 sys.executable,
