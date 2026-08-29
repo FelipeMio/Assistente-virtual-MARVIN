@@ -3427,21 +3427,123 @@ class EditTaskWindow:
 
     def _salvar(self):
         txt = self.v_txt.get().strip()
+
         if not txt:
-            self.v_err.set("Titulo nao pode ser vazio."); return
-        db_alterar(self.tid, "texto",       txt)
-        db_alterar(self.tid, "descricao",   self.v_desc.get().strip())
-        db_alterar(self.tid, "data",        self.v_data.get().strip())
-        db_alterar(self.tid, "hora",        self.v_hora.get().strip())
-        db_alterar(self.tid, "recorrencia", self.v_rep.get())
+            self.v_err.set(
+                "Titulo nao pode ser vazio."
+            )
+            return
+
+        data_txt = (
+            self.v_data
+            .get()
+            .strip()
+        )
+
+        hora = _validate_time(
+            self.v_hora.get()
+        )
+
+        # A janela legada de edicao historicamente
+        # exibe AAAA-MM-DD, enquanto a Nova Tarefa
+        # aceita DD/MM/AAAA. Mantemos compatibilidade
+        # com os dois formatos.
+        data = _validate_date(
+            data_txt
+        )
+
+        if data is None:
+            try:
+                data = (
+                    datetime.datetime.strptime(
+                        data_txt,
+                        "%Y-%m-%d"
+                    )
+                    .strftime(
+                        "%Y-%m-%d"
+                    )
+                )
+
+            except ValueError:
+                self.v_err.set(
+                    "Data invalida. Use DD/MM/AAAA ou AAAA-MM-DD."
+                )
+                return
+
+        if hora is None:
+            self.v_err.set(
+                "Horario invalido. Use HH:MM."
+            )
+            return
+
+        try:
+            task_dt = datetime.datetime.strptime(
+                f"{data} {hora}",
+                "%Y-%m-%d %H:%M"
+            )
+
+        except ValueError:
+            self.v_err.set(
+                "Data ou horario invalido."
+            )
+            return
+
+        if task_dt <= datetime.datetime.now():
+            self.v_err.set(
+                "Escolha um horario a partir do proximo minuto."
+            )
+            return
+
+        db_alterar(
+            self.tid,
+            "texto",
+            txt
+        )
+
+        db_alterar(
+            self.tid,
+            "descricao",
+            self.v_desc.get().strip()
+        )
+
+        db_alterar(
+            self.tid,
+            "data",
+            data
+        )
+
+        db_alterar(
+            self.tid,
+            "hora",
+            hora
+        )
+
+        db_alterar(
+            self.tid,
+            "recorrencia",
+            self.v_rep.get()
+        )
+
         db_alterar(
             self.tid,
             "prioridade",
             self.v_prioridade.get()
         )
-        db_alterar(self.tid, "lembrado",    0)
+
+        db_alterar(
+            self.tid,
+            "lembrado",
+            0
+        )
+
         self.callback()
-        self.comp.say("Tarefa editada!", "talking", 2000)
+
+        self.comp.say(
+            "Tarefa editada!",
+            "talking",
+            2000
+        )
+
         self.win.destroy()
 
 #  JANELA: FRASES DE ESPERA
