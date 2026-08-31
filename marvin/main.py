@@ -3055,14 +3055,18 @@ class TaskWindow:
         task = ctk.CTkFrame(
             self.lf,
 
-            fg_color="transparent",
+            fg_color=self.colors["card"],
 
-            corner_radius=0,
+            corner_radius=10,
+
+            border_width=1,
+            border_color=self.colors["border"],
         )
 
         task.pack(
             fill="x",
-            pady=(0, 2),
+            padx=2,
+            pady=(0, 8),
         )
 
 
@@ -3114,9 +3118,8 @@ class TaskWindow:
 
         check.pack(
             side="left",
-            anchor="n",
-            padx=(0, 9),
-            pady=(7, 0),
+            anchor="center",
+            padx=(12, 9),
         )
 
 
@@ -3164,6 +3167,29 @@ class TaskWindow:
         titulo.pack(
             fill="x"
         )
+
+
+        if desc.strip():
+            ctk.CTkLabel(
+                center,
+
+                text=desc.strip(),
+
+                text_color=self.colors["dim"],
+
+                anchor="w",
+                justify="left",
+
+                wraplength=300,
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                ),
+            ).pack(
+                fill="x",
+                pady=(2, 3),
+            )
 
 
         meta = ctk.CTkFrame(
@@ -3277,8 +3303,8 @@ class TaskWindow:
 
             text="Editar",
 
-            width=42,
-            height=23,
+            width=62,
+            height=30,
 
             fg_color="transparent",
             hover_color=self.colors["hover"],
@@ -3307,8 +3333,8 @@ class TaskWindow:
 
             text="Excluir",
 
-            width=45,
-            height=23,
+            width=62,
+            height=30,
 
             fg_color="transparent",
             hover_color=self.colors["hover"],
