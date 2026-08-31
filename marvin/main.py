@@ -6508,65 +6508,418 @@ class InteractionPanel:
 
 
 class SnoozeWindow:
-    OPTS = [("5 minutos", 5), ("15 minutos", 15),
-            ("30 minutos", 30), ("1 hora", 60)]
 
-    def __init__(self, root, companion, task):
+    WIDTH = 270
+    HEIGHT = 330
+
+    OPTS = [
+        ("5 minutos", 5),
+        ("15 minutos", 15),
+        ("30 minutos", 30),
+        ("1 hora", 60),
+    ]
+
+    def __init__(
+        self,
+        root,
+        companion,
+        task,
+    ):
+        self.root = root
         self.comp = companion
         self.task = task
-        self.win  = tk.Toplevel(root)
-        self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.configure(bg=C["border"])
 
-        rx = root.winfo_x()
-        ry = root.winfo_y()
-        rw = companion.W
-        sw = root.winfo_screenwidth()
-        px = rx - 208 if rx > 218 else rx + rw + 4
-        px = max(0, min(px, sw - 220))
-        self.win.geometry(f"+{px}+{max(0, ry + 20)}")
+        self.tema = cfg.get(
+            "tema",
+            "escuro"
+        )
 
-        inner = tk.Frame(self.win, bg=C["panel"])
-        inner.pack(padx=1, pady=1)
-        tk.Label(inner, text="Adiar por quanto tempo?",
-                  bg=C["panel"], fg=C["text"],
-                  font=("Consolas", 8), pady=8, padx=12).pack()
-        tk.Frame(inner, bg=C["border"], height=1).pack(fill="x", padx=8)
-        for lbl, mins in self.OPTS:
-            tk.Button(inner, text=lbl,
-                       bg=C["win_bg"], fg=C["text"], bd=0,
-                       padx=14, pady=7, cursor="hand2",
-                       font=("Consolas", 9),
-                       activebackground=C["border"],
-                       activeforeground=C["text"],
-                       command=lambda m=mins: self._snooze(m)
-                       ).pack(fill="x", padx=6, pady=2)
-        tk.Button(inner, text="Cancelar",
-                   bg=C["win_bg"], fg=C["dim"], bd=0,
-                   padx=14, pady=5, cursor="hand2",
-                   font=("Consolas", 8),
-                   activebackground=C["border"],
-                   command=self._close).pack(fill="x", padx=6, pady=2)
-        self.win.bind("<FocusOut>", lambda e: self._close())
+        self.colors = get_modern_palette(
+            self.tema,
+            "interaction"
+        )
+
+        ctk.set_appearance_mode(
+            "Light"
+            if self.tema == "claro"
+            else "Dark"
+        )
+
+        self.win = ctk.CTkToplevel(
+            root
+        )
+
+        self.win.geometry(
+            f"{self.WIDTH}x{self.HEIGHT}"
+        )
+
+        self.win.resizable(
+            False,
+            False
+        )
+
+        self.win.overrideredirect(
+            True
+        )
+
+        self.win.attributes(
+            "-topmost",
+            True
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self._build()
+
+        _position_near_marvin(
+            self.win,
+            self.comp
+        )
+
+        self.win.bind(
+            "<Escape>",
+            lambda e: self._close()
+        )
+
+        self.win.bind(
+            "<FocusOut>",
+            self._on_focus_out
+        )
+
         self.win.focus_force()
 
-    def _close(self):
+
+    def _build(self):
+
+        shell = ctk.CTkFrame(
+            self.win,
+            fg_color=self.colors["card"],
+            corner_radius=16,
+            border_width=1,
+            border_color=self.colors["border"],
+        )
+
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=2,
+            pady=2,
+        )
+
+        # ====================================================
+        # TOPO
+        # ====================================================
+
+        header = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        header.pack(
+            fill="x",
+            padx=16,
+            pady=(14, 4),
+        )
+
+        icon = ctk.CTkFrame(
+            header,
+            width=34,
+            height=34,
+            corner_radius=17,
+            fg_color=self.colors["orange_bg"],
+            border_width=1,
+            border_color=self.colors["accent"],
+        )
+
+        icon.pack(
+            side="left"
+        )
+
+        icon.pack_propagate(
+            False
+        )
+
+        ctk.CTkLabel(
+            icon,
+            text="↻",
+            text_color=self.colors["accent"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=16,
+                weight="bold",
+            ),
+        ).place(
+            relx=0.5,
+            rely=0.5,
+            anchor="center",
+        )
+
+        title_wrap = ctk.CTkFrame(
+            header,
+            fg_color="transparent",
+        )
+
+        title_wrap.pack(
+            side="left",
+            fill="x",
+            expand=True,
+            padx=(10, 0),
+        )
+
+        ctk.CTkLabel(
+            title_wrap,
+            text="Adiar tarefa",
+            anchor="w",
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=13,
+                weight="bold",
+            ),
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkLabel(
+            title_wrap,
+            text="Escolha quando quer ser lembrado novamente",
+            anchor="w",
+            text_color=self.colors["dim"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkButton(
+            header,
+            text="×",
+            width=30,
+            height=30,
+            corner_radius=8,
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+            text_color=self.colors["dim"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=18,
+            ),
+            command=self._close,
+        ).pack(
+            side="right",
+            padx=(6, 0),
+        )
+
+        # ====================================================
+        # TAREFA
+        # ====================================================
+
+        if self.task:
+            task_card = ctk.CTkFrame(
+                shell,
+                fg_color=self.colors["bg"],
+                corner_radius=9,
+                border_width=1,
+                border_color=self.colors["border"],
+            )
+
+            task_card.pack(
+                fill="x",
+                padx=16,
+                pady=(8, 12),
+            )
+
+            ctk.CTkLabel(
+                task_card,
+                text=self.task[1],
+                anchor="w",
+                justify="left",
+                wraplength=195,
+                text_color=self.colors["text"],
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                    weight="bold",
+                ),
+            ).pack(
+                fill="x",
+                padx=11,
+                pady=(8, 1),
+            )
+
+            ctk.CTkLabel(
+                task_card,
+                text=f"Horário original · {self.task[4][:5]}",
+                anchor="w",
+                text_color=self.colors["dim"],
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=8,
+                ),
+            ).pack(
+                fill="x",
+                padx=11,
+                pady=(0, 8),
+            )
+
+        # ====================================================
+        # OPCOES
+        # ====================================================
+
+        options = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        options.pack(
+            fill="x",
+            padx=16,
+        )
+
+        options.grid_columnconfigure(
+            0,
+            weight=1,
+            uniform="snooze"
+        )
+
+        options.grid_columnconfigure(
+            1,
+            weight=1,
+            uniform="snooze"
+        )
+
+        for i, (label, minutos) in enumerate(self.OPTS):
+
+            row = i // 2
+            column = i % 2
+
+            button = ctk.CTkButton(
+                options,
+                text=label,
+                height=42,
+                corner_radius=9,
+                fg_color="transparent",
+                hover_color=self.colors["orange_bg"],
+                border_width=1,
+                border_color=self.colors["border"],
+                text_color=self.colors["text"],
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                    weight="bold",
+                ),
+                command=lambda m=minutos:
+                    self._snooze(m),
+            )
+
+            button.grid(
+                row=row,
+                column=column,
+                sticky="ew",
+                padx=(
+                    (0, 4)
+                    if column == 0
+                    else (4, 0)
+                ),
+                pady=4,
+            )
+
+        ctk.CTkButton(
+            shell,
+            text="Cancelar",
+            height=30,
+            corner_radius=7,
+            fg_color="transparent",
+            hover_color=self.colors["hover"],
+            text_color=self.colors["dim"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+            ),
+            command=self._close,
+        ).pack(
+            fill="x",
+            padx=16,
+            pady=(8, 13),
+        )
+
+
+    def _on_focus_out(
+        self,
+        event=None
+    ):
+        # Pequeno atraso para permitir que o clique
+        # nos botoes seja processado antes de fechar.
         try:
-            self.win.destroy()
+            self.win.after(
+                100,
+                self._close_if_focus_lost
+            )
         except Exception:
             pass
 
-    def _snooze(self, minutes):
-        new_dt = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+
+    def _close_if_focus_lost(self):
+
+        try:
+            focus = self.win.focus_get()
+
+            if focus is None:
+                self._close()
+
+        except Exception:
+            self._close()
+
+
+    def _close(self):
+
+        try:
+            self.win.destroy()
+
+        except Exception:
+            pass
+
+
+    def _snooze(
+        self,
+        minutes
+    ):
+
+        new_dt = (
+            datetime.datetime.now()
+            + datetime.timedelta(
+                minutes=minutes
+            )
+        )
+
         if self.task:
-            db_adiar(self.task[0],
-                     new_dt.strftime("%Y-%m-%d"),
-                     new_dt.strftime("%H:%M"))
+            db_adiar(
+                self.task[0],
+                new_dt.strftime(
+                    "%Y-%m-%d"
+                ),
+                new_dt.strftime(
+                    "%H:%M"
+                )
+            )
+
         self.comp._next_reminder()
-        self.comp.say(f"Adiado para {new_dt.strftime('%H:%M')}.",
-                       "talking", 3000)
+
+        self.comp.say(
+            (
+                "Adiado para "
+                f"{new_dt.strftime('%H:%M')}."
+            ),
+            "talking",
+            3000
+        )
+
         self._close()
+
 
 #  POPUP DE NOTIFICACAO (canto inferior direito)
 
@@ -9107,13 +9460,21 @@ class MarvinCompanion:
                 self.complete_task()
 
             elif button == "snooze":
-                # O usuario respondeu ao alerta,
-                # portanto nao continua ficando impaciente.
+                # O usuario respondeu ao alerta.
+                # A escolha do tempo agora acontece
+                # na janela moderna de adiamento.
                 self._reminder_started_at = None
                 self._waiting_reaction_stage = 0
-
-                self._bubble_mode = "snooze"
                 self._bubble_hover = None
+
+                task = self.reminded_task
+
+                if task:
+                    SnoozeWindow(
+                        self.root,
+                        self,
+                        task
+                    )
 
             elif button in ("5", "15", "30", "60"):
                 task = self.reminded_task
