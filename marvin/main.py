@@ -323,30 +323,33 @@ C = get_palette(
 #
 #
 
-def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
+def _bubble_layout(text, W, cx, top_y, mode="normal"):
+    """Calcula toda a geometria visual e clicavel do balao."""
 
-    # ---------------------------------------------------------
-    # TEXTO
-    # ---------------------------------------------------------
-    wrapped = textwrap.wrap(text, width=26)[:4]
+    wrapped = textwrap.wrap(
+        text,
+        width=26
+    )[:4]
 
     if not wrapped:
-        return
+        return None
 
-    line_h, py = 15, 9
+    line_h = 15
+    py = 9
 
-    # Altura adicional para os controles
     if mode == "alert":
         button_h = 34
+
     elif mode == "snooze":
         button_h = 54
+
     else:
         button_h = 0
 
-    # O balão precisa caber dentro do Canvas.
-    # Antes ele ficava maior que a janela e cortava o último botão.
-    # Mantem qualquer balao dentro da largura do Canvas
-    bw = max(1, W - 12)
+    bw = max(
+        1,
+        W - 12
+    )
 
     bh = (
         len(wrapped) * line_h
@@ -354,8 +357,88 @@ def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
         + button_h
     )
 
-    bx = max(6, cx - bw // 2)
-    by = max(6, top_y - bh - 16)
+    bx = max(
+        6,
+        cx - bw // 2
+    )
+
+    by = max(
+        6,
+        top_y - bh - 16
+    )
+
+    layout = {
+        "wrapped": wrapped,
+        "line_h": line_h,
+        "py": py,
+        "bw": bw,
+        "bh": bh,
+        "bx": bx,
+        "by": by,
+        "button_y": None,
+    }
+
+    if mode in (
+        "alert",
+        "snooze",
+    ):
+        layout["button_y"] = (
+            by
+            + py
+            + len(wrapped) * line_h
+            + 5
+        )
+
+    if mode == "alert":
+        layout["complete_x"] = (
+            bx + bw // 3
+        )
+
+        layout["snooze_x"] = (
+            bx + (bw * 2) // 3
+        )
+
+    elif mode == "snooze":
+        spacing = bw / 4
+
+        layout["option_x"] = {
+            value: (
+                bx
+                + spacing * i
+                + spacing / 2
+            )
+            for i, value in enumerate(
+                ("5", "15", "30", "60")
+            )
+        }
+
+        layout["back_y"] = (
+            layout["button_y"] + 31
+        )
+
+    return layout
+
+
+def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
+
+    layout = _bubble_layout(
+        text,
+        W,
+        cx,
+        top_y,
+        mode
+    )
+
+    if layout is None:
+        return
+
+    wrapped = layout["wrapped"]
+    line_h = layout["line_h"]
+    py = layout["py"]
+    bw = layout["bw"]
+    bh = layout["bh"]
+    bx = layout["bx"]
+    by = layout["by"]
 
     # ---------------------------------------------------------
     # SOMBRA
@@ -431,11 +514,12 @@ def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
     # =========================================================
     if mode == "alert":
 
-        button_y = by + py + len(wrapped) * line_h + 5
+        button_y = layout["button_y"]
 
-        # posições dos dois botões
-        complete_x = bx + bw // 3
-        snooze_x = bx + (bw * 2) // 3
+        # Posicoes vindas da mesma geometria
+        # usada para detectar os cliques.
+        complete_x = layout["complete_x"]
+        snooze_x = layout["snooze_x"]
 
         # -------------------------
         # CONCLUIR
@@ -504,7 +588,7 @@ def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
     # =========================================================
     elif mode == "snooze":
 
-        button_y = by + py + len(wrapped) * line_h + 5
+        button_y = layout["button_y"]
 
         options = [
             ("5", "5m"),
@@ -513,11 +597,9 @@ def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
             ("60", "1h"),
         ]
 
-        spacing = bw / 4
+        for value, label in options:
 
-        for i, (value, label) in enumerate(options):
-
-            x = bx + spacing * i + spacing / 2
+            x = layout["option_x"][value]
 
             active = hover == value
 
@@ -542,7 +624,7 @@ def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
         # -------------------------
         # VOLTAR
         # -------------------------
-        back_y = button_y + 31
+        back_y = layout["back_y"]
 
         active = hover == "back"
 
@@ -8944,42 +9026,25 @@ class MarvinCompanion:
             # Nenhum sprite disponivel.
             top_y = self.H - 8 + bob
 
-        wrapped = textwrap.wrap(self.bubble, width=26)[:4]
-
-        if not wrapped:
-            return None
-
-        line_h = 15
-        py = 9
-
-        button_h = 34 if self._bubble_mode == "alert" else 54
-
-        # Largura do balão.
-        # No menu de adiamento usamos toda a largura disponível
-        # para garantir espaço para 5m / 15m / 30m / 1h.
-        # Mesma largura usada em draw_bubble()
-        bw = max(1, self.W - 12)
-
-        bh = (
-            len(wrapped) * line_h
-            + py * 2
-            + button_h
+        layout = _bubble_layout(
+            self.bubble,
+            self.W,
+            self.W // 2,
+            top_y,
+            self._bubble_mode
         )
 
-        bx = max(6, self.W // 2 - bw // 2)
-        by = max(6, top_y - bh - 16)
+        if layout is None:
+            return None
+
+        bx = layout["bx"]
+        bw = layout["bw"]
+        button_y = layout["button_y"]
 
         if self._bubble_mode == "alert":
 
-            button_y = (
-                by
-                + py
-                + len(wrapped) * line_h
-                + 5
-            )
-
-            complete_x = bx + bw // 3
-            snooze_x = bx + (bw * 2) // 3
+            complete_x = layout["complete_x"]
+            snooze_x = layout["snooze_x"]
 
             if (
                 (x - complete_x) ** 2
@@ -8997,19 +9062,9 @@ class MarvinCompanion:
 
         elif self._bubble_mode == "snooze":
 
-            button_y = (
-                by
-                + py
-                + len(wrapped) * line_h
-                + 5
-            )
-
-            spacing = bw / 4
-            options = ["5", "15", "30", "60"]
-
-            for i, value in enumerate(options):
-
-                x_button = bx + spacing * i + spacing / 2
+            for value, x_button in (
+                layout["option_x"].items()
+            ):
 
                 if (
                     (x - x_button) ** 2
@@ -9018,7 +9073,7 @@ class MarvinCompanion:
                 ):
                     return value
 
-            back_y = button_y + 31
+            back_y = layout["back_y"]
 
             if (
                 abs(x - (bx + bw // 2)) <= 45
