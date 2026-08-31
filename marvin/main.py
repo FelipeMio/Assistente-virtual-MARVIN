@@ -5524,7 +5524,7 @@ class SettingsWindow:
 
 class InteractionPanel:
 
-    WIDTH = 232
+    WIDTH = 210
 
     def __init__(
         self,
@@ -5824,7 +5824,11 @@ class InteractionPanel:
     # HEADER
     # ========================================================
 
-    def _header(self, parent):
+    def _header(
+        self,
+        parent,
+        actions=False,
+    ):
 
         header = ctk.CTkFrame(
             parent,
@@ -5841,7 +5845,10 @@ class InteractionPanel:
         )
 
 
-        # Cabeca do MARVIN
+        # ----------------------------------------------------
+        # MARVIN
+        # ----------------------------------------------------
+
         icon_path = (
             Path(__file__)
             .resolve()
@@ -5875,7 +5882,6 @@ class InteractionPanel:
             )
 
         except Exception:
-            # Fallback caso a imagem nao seja encontrada.
             ctk.CTkLabel(
                 header,
                 text="M",
@@ -5916,6 +5922,88 @@ class InteractionPanel:
         )
 
 
+        # ----------------------------------------------------
+        # CONTROLES DO CABECALHO
+        # ----------------------------------------------------
+
+        if actions:
+
+            ctk.CTkButton(
+                header,
+
+                text="×",
+
+                width=30,
+                height=30,
+
+                corner_radius=7,
+
+                fg_color="transparent",
+
+                hover_color=self.colors[
+                    "orange_bg"
+                ],
+
+                text_color=self.colors[
+                    "dim"
+                ],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=18,
+                ),
+
+                command=lambda: [
+                    self._close(),
+                    self.comp._on_close(),
+                ],
+
+            ).pack(
+                side="right",
+                padx=(2, 8),
+            )
+
+
+            ctk.CTkButton(
+                header,
+
+                text="⚙",
+
+                width=30,
+                height=30,
+
+                corner_radius=7,
+
+                fg_color="transparent",
+
+                hover_color=self.colors[
+                    "hover"
+                ],
+
+                text_color=self.colors[
+                    "dim"
+                ],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI Symbol",
+                    size=16,
+                ),
+
+                command=lambda: [
+                    self._close(),
+                    SettingsWindow(
+                        self.root,
+                        self.comp
+                    ),
+                ],
+
+            ).pack(
+                side="right",
+                padx=2,
+                pady=(3, 0),
+            )
+
+
         ctk.CTkFrame(
             parent,
 
@@ -5931,6 +6019,8 @@ class InteractionPanel:
             fill="x",
             padx=14,
         )
+
+
 
 
     # ========================================================
@@ -6020,11 +6110,13 @@ class InteractionPanel:
     ):
 
         self._header(
-            parent
+            parent,
+            actions=True,
         )
 
 
         rows = db_listar()
+
 
         n = len([
             r
@@ -6037,6 +6129,7 @@ class InteractionPanel:
             datetime.date.today()
             .isoformat()
         )
+
 
         n_hoje = len([
             r
@@ -6053,6 +6146,10 @@ class InteractionPanel:
         )
 
 
+        # ====================================================
+        # RESUMO
+        # ====================================================
+
         body = ctk.CTkFrame(
             parent,
             fg_color="transparent",
@@ -6060,84 +6157,10 @@ class InteractionPanel:
 
         body.pack(
             fill="x",
-            padx=8,
-            pady=(14, 7),
+            padx=14,
+            pady=(17, 14),
         )
 
-
-        # ----------------------------------------------------
-        # ICONE CENTRAL
-        # ----------------------------------------------------
-
-        if n == 0:
-            icon_bg = self.colors[
-                "green_bg"
-            ]
-
-            icon_fg = self.colors[
-                "green"
-            ]
-
-            icon_text = "✓"
-
-        else:
-            icon_bg = self.colors[
-                "orange_bg"
-            ]
-
-            icon_fg = self.colors[
-                "accent"
-            ]
-
-            icon_text = str(
-                min(n, 99)
-            )
-
-
-        icon = ctk.CTkFrame(
-            body,
-
-            width=34,
-            height=34,
-
-            corner_radius=17,
-
-            fg_color=icon_bg,
-
-            border_width=1,
-            border_color=icon_fg,
-        )
-
-        icon.pack()
-
-        icon.pack_propagate(
-            False
-        )
-
-
-        ctk.CTkLabel(
-            icon,
-
-            text=icon_text,
-
-            text_color=icon_fg,
-
-            font=ctk.CTkFont(
-                family="Segoe UI",
-                size=14,
-                weight="bold",
-            ),
-
-        ).place(
-            relx=0.5,
-            rely=0.5,
-            anchor="center",
-        )
-
-
-        # ----------------------------------------------------
-        # MENSAGEM
-        # ----------------------------------------------------
 
         if n == 0:
             mensagem = (
@@ -6169,39 +6192,52 @@ class InteractionPanel:
                 size=11,
             ),
 
-        ).pack(
-            pady=(9, 0),
+        ).pack()
+
+
+        # ----------------------------------------------------
+        # ESTATISTICAS NA MESMA LINHA
+        # ----------------------------------------------------
+
+        stats = ctk.CTkFrame(
+            body,
+            fg_color="transparent",
+        )
+
+        stats.pack(
+            pady=(7, 0),
         )
 
 
-        if n_hoje:
-            hoje_texto = (
-                "1 para hoje."
-                if n_hoje == 1
-                else
-                f"{n_hoje} para hoje."
-            )
+        hoje_texto = (
+            "1 para hoje."
+            if n_hoje == 1
+            else
+            f"{n_hoje} para hoje."
+        )
 
-            ctk.CTkLabel(
-                body,
 
-                text=hoje_texto,
+        ctk.CTkLabel(
+            stats,
 
-                text_color=self.colors[
-                    "dim"
-                ],
+            text=hoje_texto,
 
-                font=ctk.CTkFont(
-                    family="Segoe UI",
-                    size=9,
-                ),
+            text_color=self.colors[
+                "dim"
+            ],
 
-            ).pack(
-                pady=(2, 0),
-            )
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+
+        ).pack(
+            side="left",
+        )
 
 
         if streak:
+
             streak_texto = (
                 "1 concluída hoje"
                 if streak == 1
@@ -6209,8 +6245,9 @@ class InteractionPanel:
                 f"{streak} concluídas hoje"
             )
 
+
             ctk.CTkLabel(
-                body,
+                stats,
 
                 text=streak_texto,
 
@@ -6220,17 +6257,18 @@ class InteractionPanel:
 
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=9,
+                    size=8,
                 ),
 
             ).pack(
-                pady=(2, 0),
+                side="left",
+                padx=(12, 0),
             )
 
 
-        # ----------------------------------------------------
-        # ACOES
-        # ----------------------------------------------------
+        # ====================================================
+        # CENTRAL
+        # ====================================================
 
         self._button(
             parent,
@@ -6244,28 +6282,109 @@ class InteractionPanel:
         )
 
 
-        if n:
-            self._button(
-                parent,
+        # ====================================================
+        # TAREFAS + NOVA TAREFA
+        # ====================================================
 
-                "Ver tarefas",
-
-                lambda: [
-                    self._close(),
-                    TaskWindow(
-                        self.root,
-                        self.comp
-                    )
-                ],
-            )
-
-
-        self._button(
+        task_actions = ctk.CTkFrame(
             parent,
+            fg_color="transparent",
+        )
 
-            "+ Nova tarefa",
+        task_actions.pack(
+            fill="x",
+            padx=14,
+            pady=3,
+        )
 
-            lambda: [
+        task_actions.grid_columnconfigure(
+            0,
+            weight=1,
+            uniform="task_actions",
+        )
+
+        task_actions.grid_columnconfigure(
+            1,
+            weight=1,
+            uniform="task_actions",
+        )
+
+
+        ctk.CTkButton(
+            task_actions,
+
+            text="Ver tarefas",
+
+            width=1,
+            height=32,
+
+            corner_radius=7,
+
+            fg_color="transparent",
+
+            hover_color=self.colors[
+                "hover"
+            ],
+
+            border_width=1,
+
+            border_color=self.colors[
+                "border"
+            ],
+
+            text_color=self.colors[
+                "text"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+            command=lambda: [
+                self._close(),
+                TaskWindow(
+                    self.root,
+                    self.comp
+                )
+            ],
+
+        ).grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=(0, 3),
+        )
+
+
+        ctk.CTkButton(
+            task_actions,
+
+            text="+ Nova tarefa",
+
+            width=1,
+            height=32,
+
+            corner_radius=7,
+
+            fg_color=self.colors[
+                "accent"
+            ],
+
+            hover_color=self.colors[
+                "accent_hover"
+            ],
+
+            text_color="#FFFFFF",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+            command=lambda: [
                 self._close(),
                 NewTaskWindow(
                     self.root,
@@ -6273,9 +6392,33 @@ class InteractionPanel:
                 )
             ],
 
-            accent=True,
+        ).grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(3, 0),
         )
 
+
+        # ====================================================
+        # MODO COMPACTO
+        # ====================================================
+
+        self._button(
+            parent,
+
+            self.comp._np_label(),
+
+            lambda: [
+                self._close(),
+                self.comp._toggle_np()
+            ],
+        )
+
+
+        # ====================================================
+        # AGORA NAO
+        # ====================================================
 
         agora_nao = ctk.CTkButton(
             parent,
@@ -6304,11 +6447,14 @@ class InteractionPanel:
             command=self._close,
         )
 
+
         agora_nao.pack(
             fill="x",
             padx=14,
-            pady=(2, 11),
+            pady=(4, 11),
         )
+
+
 
 
     # ========================================================
@@ -7189,48 +7335,10 @@ class MarvinCompanion:
         self.cv.bind("<ButtonPress-1>",   self._drag_start)
         self.cv.bind("<B1-Motion>",       self._drag_move)
         self.cv.bind("<ButtonRelease-1>", self._drag_end)
-        self.cv.bind("<Button-3>",        self._show_menu)
 
         self.root.protocol("WM_DELETE_WINDOW", self._hide_marvin)
         self.root.bind_all("<Control-Shift-N>",
                             lambda e: NewTaskWindow(self.root, self))
-
-        # Menu contextual — textvariable NAO e suportado em add_command,
-        # por isso usamos label fixo e atualizamos com entryconfig pelo indice
-        self.ctx = tk.Menu(self.root, tearoff=0,
-                            bg=C["panel"], fg=C["accent"],
-                            activebackground=C["border"],
-                            activeforeground=C["text"],
-                            font=("Consolas", 9), bd=0)
-        self.ctx.add_command(
-            label="Central do MARVIN",
-            command=self._open_home)                                 # indice 0
-
-        self.ctx.add_command(
-            label="+ Nova Tarefa  [Ctrl+Shift+N]",
-            command=lambda: NewTaskWindow(self.root, self))          # indice 1
-
-        self.ctx.add_separator()                                     # indice 2
-
-        self.ctx.add_command(
-            label=self._np_label(),
-            command=self._toggle_np)                                 # indice 3
-
-        self.ctx.add_command(
-            label="Configuracoes",
-            command=lambda: SettingsWindow(self.root, self))         # indice 4
-
-        self.ctx.add_separator()                                     # indice 5
-
-        self.ctx.add_command(
-            label="Ocultar MARVIN",
-            command=self._hide_marvin)                               # indice 6
-
-        self.ctx.add_separator()                                     # indice 7
-
-        self.ctx.add_command(
-            label="Sair",
-            command=self._on_close)                                  # indice 8
 
         self._start_tray()
 
@@ -8737,11 +8845,6 @@ class MarvinCompanion:
             if self._compact_mode:
                 self._restore_normal_layout()
 
-        self.ctx.entryconfig(
-            3,
-            label=self._np_label()
-        )
-
         if self._tray_icon is not None:
             try:
                 self._tray_icon.update_menu()
@@ -9484,11 +9587,6 @@ class MarvinCompanion:
             )
         )
 
-    def _show_menu(self, e):
-        try:
-            self.ctx.tk_popup(e.x_root, e.y_root)
-        finally:
-            self.ctx.grab_release()
 
  
 
