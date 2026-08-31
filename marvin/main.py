@@ -679,6 +679,7 @@ REPEAT_OPTS = ["Nunca", "Todo dia", "Toda semana",
                "Seg/Qua/Sex", "Seg a Sex", "Fins de semana"]
 
 PRIORITY_OPTS = [
+    "Nenhuma",
     "Baixa",
     "Normal",
     "Alta",
@@ -6298,14 +6299,14 @@ class InteractionPanel:
         )
 
 
-        queue = (
+        reminder_queue = (
             self.comp
             ._reminder_queue
         )
 
         task = (
-            queue[0]
-            if queue
+            reminder_queue[0]
+            if reminder_queue
             else None
         )
 
@@ -6428,18 +6429,24 @@ class InteractionPanel:
 
 
         n_fila = len(
-            queue
+            reminder_queue
         )
 
 
         if n_fila > 1:
+            restantes = n_fila - 1
+
+            fila_texto = (
+                f"+1 lembrete na fila"
+                if restantes == 1
+                else
+                f"+{restantes} lembretes na fila"
+            )
+
             ctk.CTkLabel(
                 body,
 
-                text=(
-                    f"+{n_fila - 1} "
-                    "lembrete(s) na fila"
-                ),
+                text=fila_texto,
 
                 text_color=self.colors[
                     "dim"
@@ -6529,6 +6536,33 @@ class SnoozeWindow:
         self.comp = companion
         self.task = task
 
+        # Guarda o balao atual para poder restaura-lo
+        # caso o usuario cancele o adiamento.
+        self._restore_bubble = ""
+
+        current_task = (
+            self.comp.reminded_task
+        )
+
+        self._owns_current_reminder = bool(
+            self.task
+            and current_task
+            and current_task[0] == self.task[0]
+        )
+
+        if self._owns_current_reminder:
+            self._restore_bubble = (
+                self.comp.bubble
+            )
+
+            # Enquanto a janela de adiamento estiver aberta,
+            # o balao antigo nao pode continuar interativo.
+            self.comp.bubble = ""
+            self.comp.b_timer = 0
+            self.comp._bubble_deadline = None
+            self.comp._bubble_mode = "normal"
+            self.comp._bubble_hover = None
+
         self.tema = cfg.get(
             "tema",
             "escuro"
@@ -6580,7 +6614,7 @@ class SnoozeWindow:
 
         self.win.bind(
             "<Escape>",
-            lambda e: self._close()
+            lambda e: self._cancel()
         )
 
         self.win.bind(
@@ -6708,7 +6742,7 @@ class SnoozeWindow:
                 family="Segoe UI",
                 size=18,
             ),
-            command=self._close,
+            command=self._cancel,
         ).pack(
             side="right",
             padx=(6, 0),
@@ -6840,7 +6874,7 @@ class SnoozeWindow:
                 family="Segoe UI",
                 size=9,
             ),
-            command=self._close,
+            command=self._cancel,
         ).pack(
             fill="x",
             padx=16,
@@ -6869,10 +6903,48 @@ class SnoozeWindow:
             focus = self.win.focus_get()
 
             if focus is None:
-                self._close()
+                self._cancel()
 
         except Exception:
-            self._close()
+            self._cancel()
+
+
+    def _task_is_current(self):
+        """Confirma que esta janela ainda controla o lembrete atual."""
+
+        current_task = (
+            self.comp.reminded_task
+        )
+
+        return bool(
+            self.task
+            and current_task
+            and current_task[0] == self.task[0]
+        )
+
+
+    def _cancel(self):
+        """Fecha o adiamento e devolve o controle ao balao."""
+
+        if self._task_is_current():
+
+            self.comp.bubble = (
+                self._restore_bubble
+                or self.task[1]
+            )
+
+            self.comp._bubble_mode = "alert"
+            self.comp._bubble_hover = None
+
+            # Reinicia a contagem da reacao de espera,
+            # pois o usuario voltou ao alerta.
+            self.comp._reminder_started_at = (
+                time.monotonic()
+            )
+
+            self.comp._waiting_reaction_stage = 0
+
+        self._close()
 
 
     def _close(self):
@@ -6888,6 +6960,13 @@ class SnoozeWindow:
         self,
         minutes
     ):
+
+        # A janela pode ter ficado aberta enquanto
+        # a tarefa foi resolvida por outra interface.
+        # Nesse caso nao toca mais no banco.
+        if not self._task_is_current():
+            self._close()
+            return
 
         new_dt = (
             datetime.datetime.now()

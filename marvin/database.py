@@ -133,7 +133,8 @@ def db_listar(apenas_pendentes=False):
             "WHEN 'Alta' THEN 0 "
             "WHEN 'Normal' THEN 1 "
             "WHEN 'Baixa' THEN 2 "
-            "ELSE 1 END, "
+            "WHEN 'Nenhuma' THEN 3 "
+            "ELSE 3 END, "
             "data,hora"
         )
 
@@ -160,7 +161,7 @@ def db_listar_com_prioridade(
             "id,texto,descricao,data,hora,recorrencia,"
             "concluida,lembrado,"
             "CASE "
-            "WHEN prioridade IN ('Baixa','Normal','Alta') "
+            "WHEN prioridade IN ('Nenhuma','Baixa','Normal','Alta') "
             "THEN prioridade "
             "ELSE 'Normal' "
             "END "
@@ -176,7 +177,8 @@ def db_listar_com_prioridade(
             "WHEN 'Alta' THEN 0 "
             "WHEN 'Normal' THEN 1 "
             "WHEN 'Baixa' THEN 2 "
-            "ELSE 1 END, "
+            "WHEN 'Nenhuma' THEN 3 "
+            "ELSE 3 END, "
             "data,hora"
         )
 
@@ -200,6 +202,7 @@ def db_prioridade(tid):
         prioridade = str(row[0]).strip()
 
         if prioridade not in (
+            "Nenhuma",
             "Baixa",
             "Normal",
             "Alta",
