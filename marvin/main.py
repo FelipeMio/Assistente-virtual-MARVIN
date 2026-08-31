@@ -10,6 +10,32 @@ try:
 except ImportError:
     pystray = None
 
+
+# ============================================================
+# WIN32
+# ============================================================
+
+ctypes = None
+wintypes = None
+MONITORINFO = None
+
+if sys.platform == "win32":
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+    except ImportError:
+        pass
+
+    else:
+        class MONITORINFO(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("rcMonitor", wintypes.RECT),
+                ("rcWork", wintypes.RECT),
+                ("dwFlags", wintypes.DWORD),
+            ]
+
 from .config import load_cfg, save_cfg
 from .theme import get_palette, get_modern_palette
 
@@ -610,16 +636,7 @@ def _position_near_marvin(win, companion):
 
     if sys.platform == "win32":
         try:
-            import ctypes
-            from ctypes import wintypes
 
-            class MONITORINFO(ctypes.Structure):
-                _fields_ = [
-                    ("cbSize", wintypes.DWORD),
-                    ("rcMonitor", wintypes.RECT),
-                    ("rcWork", wintypes.RECT),
-                    ("dwFlags", wintypes.DWORD),
-                ]
 
             user32 = ctypes.windll.user32
 
@@ -5510,30 +5527,7 @@ class InteractionPanel:
 
         if sys.platform == "win32":
             try:
-                import ctypes
-                from ctypes import wintypes
 
-                class MONITORINFO(
-                    ctypes.Structure
-                ):
-                    _fields_ = [
-                        (
-                            "cbSize",
-                            wintypes.DWORD
-                        ),
-                        (
-                            "rcMonitor",
-                            wintypes.RECT
-                        ),
-                        (
-                            "rcWork",
-                            wintypes.RECT
-                        ),
-                        (
-                            "dwFlags",
-                            wintypes.DWORD
-                        ),
-                    ]
 
                 user32 = (
                     ctypes.windll.user32
@@ -7187,8 +7181,6 @@ class MarvinCompanion:
             return None
 
         try:
-            import ctypes
-            from ctypes import wintypes
 
             user32 = ctypes.windll.user32
 
@@ -7219,8 +7211,6 @@ class MarvinCompanion:
     def _win32_cursor_pos(self):
         if sys.platform == "win32":
             try:
-                import ctypes
-                from ctypes import wintypes
 
                 point = wintypes.POINT()
 
@@ -7250,16 +7240,7 @@ class MarvinCompanion:
         """
         if sys.platform == "win32":
             try:
-                import ctypes
-                from ctypes import wintypes
 
-                class MONITORINFO(ctypes.Structure):
-                    _fields_ = [
-                        ("cbSize", wintypes.DWORD),
-                        ("rcMonitor", wintypes.RECT),
-                        ("rcWork", wintypes.RECT),
-                        ("dwFlags", wintypes.DWORD),
-                    ]
 
                 user32 = ctypes.windll.user32
 
@@ -7326,8 +7307,6 @@ class MarvinCompanion:
 
         if hwnd is not None:
             try:
-                import ctypes
-                from ctypes import wintypes
 
                 rect = wintypes.RECT()
 
@@ -7368,8 +7347,6 @@ class MarvinCompanion:
             and hwnd is not None
         ):
             try:
-                import ctypes
-                from ctypes import wintypes
 
                 user32 = ctypes.windll.user32
 
@@ -7613,7 +7590,6 @@ class MarvinCompanion:
 
         if sys.platform == "win32":
             try:
-                import ctypes
 
                 # Se o botao esquerdo foi solto,
                 # encerra mesmo que o Tkinter nao receba
