@@ -6,6 +6,15 @@ from pathlib import Path
 from .history import registrar_leitura
 
 
+# Horas que realmente possuem dados do monitoramento.
+HORA_INICIO_GOE = 8
+HORA_FIM_GOE = 20
+
+# Durante a hora seguinte ainda permitimos a leitura
+# para consolidar a ultima hora completa (20h).
+HORA_CONSOLIDACAO_FINAL = HORA_FIM_GOE + 1
+
+
 def caminho_csv_goe():
     personalizado = os.getenv(
         "MARVIN_GOE_CSV"
@@ -200,6 +209,12 @@ class GOEMonitor:
         self.intervalo_ms = intervalo_ms
 
         self._ultimo_mtime = None
+
+        # Evita executar duas vezes o mesmo resultado
+        # quando o CSV e exportado mais de uma vez
+        # dentro da mesma hora.
+        self._ultima_leitura_processada = None
+
         self._em_alerta = False
         self._ativo = True
 
@@ -322,6 +337,37 @@ class GOEMonitor:
                 self._agendar()
                 return
 
+            # -------------------------------------------------
+            # JANELA OPERACIONAL
+            #
+            # O GOE possui dados de 08h a 20h.
+            # Durante 21h ainda permitimos uma leitura para
+            # consolidar a hora final das 20h.
+            #
+            # De 22h ate 07h o CSV e completamente ignorado.
+            # -------------------------------------------------
+            agora = datetime.datetime.now()
+
+            if (
+                agora.hour < HORA_INICIO_GOE
+                or agora.hour > HORA_CONSOLIDACAO_FINAL
+            ):
+                # Absorve alteracoes feitas pelo agendador
+                # durante a madrugada para que elas nao sejam
+                # processadas quando a janela reabrir.
+                try:
+                    if self.arquivo.exists():
+                        self._ultimo_mtime = (
+                            self.arquivo
+                            .stat()
+                            .st_mtime_ns
+                        )
+                except Exception:
+                    pass
+
+                self._agendar()
+                return
+
             if not self.arquivo.exists():
                 self._agendar()
                 return
@@ -381,6 +427,36 @@ class GOEMonitor:
                     "[GOE] Erro ao salvar "
                     f"historico: {exc}"
                 )
+
+            # -------------------------------------------------
+            # DEDUPLICACAO
+            #
+            # Duas exportacoes podem conter exatamente a mesma
+            # ultima hora completa. Nesse caso o historico ja
+            # foi atualizado acima, mas nao repetimos log,
+            # aviso nem callback.
+            # -------------------------------------------------
+            chave_leitura = (
+                str(
+                    status.get("data")
+                ),
+                status.get("hora"),
+                status.get("qtde"),
+                bool(
+                    status.get("atual")
+                ),
+            )
+
+            if (
+                chave_leitura
+                == self._ultima_leitura_processada
+            ):
+                self._agendar()
+                return
+
+            self._ultima_leitura_processada = (
+                chave_leitura
+            )
 
             # Resultado antigo pode entrar no historico,
             # mas nunca deve gerar alerta.
