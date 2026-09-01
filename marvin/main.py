@@ -509,7 +509,6 @@ def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
 
 _IDLE_MSGS = [
     
-    "Clique com botao esquerdo para o menu.",
     "Clique com botao direito para o menu.",
   
     
@@ -7204,6 +7203,7 @@ class MarvinCompanion:
         self.cv.bind("<ButtonPress-1>",   self._drag_start)
         self.cv.bind("<B1-Motion>",       self._drag_move)
         self.cv.bind("<ButtonRelease-1>", self._drag_end)
+        self.cv.bind("<Button-3>",         self._on_click)
 
         self.root.protocol("WM_DELETE_WINDOW", self._hide_marvin)
         self.root.bind_all("<Control-Shift-N>",
@@ -9404,19 +9404,11 @@ class MarvinCompanion:
                 self._bubble_mode = "alert"
                 self._bubble_hover = None
 
-            else:
-                # Clique esquerdo comum:
-                # abre o painel somente quando nao existe lembrete ativo.
-                if (
-                    self._bubble_mode == "normal"
-                    and not self._reminder_queue
-                ):
-                    self._on_click()
 
         self._dragging = False
         self._drag_dist = 0
 
-    def _on_click(self):
+    def _on_click(self, e=None):
         # Durante alertas, toda interacao acontece no proprio balao.
         if self._bubble_mode in ("alert", "snooze"):
             return
