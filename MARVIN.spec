@@ -1,4 +1,4 @@
-﻿# -*- mode: python ; coding: utf-8 -*-
+# -*- mode: python ; coding: utf-8 -*-
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -46,6 +46,9 @@ exe = EXE(
     exclude_binaries=True,
 
     name="MARVIN",
+
+    icon="assets/marvin/marvin.ico",
+    version="installer/version_info.txt",
 
     debug=False,
     bootloader_ignore_signals=False,

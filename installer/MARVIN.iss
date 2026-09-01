@@ -1,5 +1,6 @@
-﻿#define MyAppName "MARVIN"
+#define MyAppName "MARVIN"
 #define MyAppVersion "0.1.0"
+#define MyAppPublisher "FelipeMio"
 #define MyAppExeName "MARVIN.exe"
 
 [Setup]
@@ -7,6 +8,15 @@ AppId=MARVIN.AssistenteVirtual
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+
+VersionInfoVersion=0.1.0.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=MARVIN - Assistente Virtual
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+
+SetupIconFile=..\assets\marvin\marvin.ico
 
 DefaultDirName={localappdata}\Programs\MARVIN
 DefaultGroupName=MARVIN

@@ -5821,10 +5821,18 @@ class InteractionPanel:
                     size=18,
                 ),
 
-                command=lambda: [
-                    self._close(),
-                    self.comp._on_close(),
-                ],
+                command=lambda: (
+                    [
+                        self._close(),
+                        self.comp._on_close(),
+                    ]
+                    if messagebox.askyesno(
+                        "Fechar MARVIN",
+                        "Deseja realmente fechar o MARVIN?",
+                        parent=self.win,
+                    )
+                    else None
+                ),
 
             ).pack(
                 side="right",
