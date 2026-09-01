@@ -5,3 +5,5 @@ build/
 dist/
 
 extensions/goe/config.json
+
+release/
