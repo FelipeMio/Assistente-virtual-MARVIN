@@ -40,6 +40,7 @@ from .config import load_cfg, save_cfg
 from .theme import get_palette, get_modern_palette
 
 from .extension_loader import carregar_extensoes
+from .notifications import NotificationManager
 from .checklist import abrir_checklist
 from .ui.home import abrir_home
 
@@ -7221,6 +7222,9 @@ class MarvinCompanion:
 
         self._animate()
         self._start_reminders()
+
+        # Sistema central de notificacoes do MARVIN.
+        self.notifications = NotificationManager()
 
         # Carrega extensoes opcionais instaladas.
         self._extensions = carregar_extensoes(self)

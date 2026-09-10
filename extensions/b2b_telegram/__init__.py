@@ -102,6 +102,7 @@ def iniciar_extensao(comp):
     estado = {
         "janela": None,
         "aviso_ativo": False,
+        "notification_id": None,
     }
 
     def preparar_mensagem(texto):
@@ -154,8 +155,26 @@ def iniciar_extensao(comp):
             pass
 
     def entendi():
+        notification_id = estado.get(
+            "notification_id"
+        )
+
+        if notification_id:
+            try:
+                comp.notifications.marcar_como_lida(
+                    notification_id
+                )
+
+            except Exception as exc:
+                print(
+                    "[B2B Telegram] "
+                    "Erro ao marcar notificacao "
+                    f"como lida: {exc}"
+                )
+
         estado["janela"] = None
         estado["aviso_ativo"] = False
+        estado["notification_id"] = None
 
         limpar_balao()
 
@@ -166,9 +185,12 @@ def iniciar_extensao(comp):
             processar_fila,
         )
 
-    def mostrar_aviso(texto):
-        mensagem = preparar_mensagem(
-            texto
+    def mostrar_aviso(
+        mensagem,
+        notification_id=None,
+    ):
+        estado["notification_id"] = (
+            notification_id
         )
 
         try:
@@ -234,8 +256,14 @@ def iniciar_extensao(comp):
             not estado["aviso_ativo"]
             and pendentes
         ):
-            texto = pendentes.popleft()
-            mostrar_aviso(texto)
+            mensagem, notification_id = (
+                pendentes.popleft()
+            )
+
+            mostrar_aviso(
+                mensagem,
+                notification_id,
+            )
 
         try:
             comp.root.after(
@@ -249,7 +277,38 @@ def iniciar_extensao(comp):
     def recebeu_mensagem(texto):
         # Esta funcao roda na thread
         # do Telegram.
-        entrada_thread.put(texto)
+
+        mensagem = preparar_mensagem(
+            texto
+        )
+
+        notification_id = None
+
+        try:
+            notification_id = (
+                comp.notifications.adicionar(
+                    origem="B2B",
+                    titulo="Novo aviso B2B",
+                    mensagem=mensagem,
+                    metadata={
+                        "extensao": "b2b_telegram",
+                    },
+                )
+            )
+
+        except Exception as exc:
+            print(
+                "[B2B Telegram] "
+                "Erro ao registrar notificacao: "
+                f"{exc}"
+            )
+
+        entrada_thread.put(
+            (
+                mensagem,
+                notification_id,
+            )
+        )
 
     monitor = B2BTelegramMonitor(
         token=token,
