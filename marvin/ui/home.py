@@ -9,13 +9,14 @@ from marvin.database import db_listar
 from marvin.checklist import listar_hoje
 
 from .window_position import position_near
+from .notifications_history import abrir_notificacoes
 
 
 
 class HomeWindow:
 
     WIDTH = 360
-    HEIGHT = 465
+    HEIGHT = 545
 
     def __init__(
         self,
@@ -140,7 +141,48 @@ class HomeWindow:
             pass
 
 
-    # ========================================================
+    def _open_notifications(self):
+        try:
+            position = (
+                self.win.winfo_x(),
+                self.win.winfo_y(),
+            )
+        except Exception:
+            position = None
+
+        self._hide()
+
+        try:
+            abrir_notificacoes(
+                self.comp.root,
+                self.comp,
+                on_change=self.refresh,
+                on_close=(
+                    self._restore_from_notifications
+                ),
+                position=position,
+            )
+
+        except Exception:
+            self._restore_from_notifications()
+            raise
+
+
+    def _restore_from_notifications(self):
+        try:
+            if not self.win.winfo_exists():
+                return
+
+            self.refresh()
+
+            self.win.deiconify()
+            self.win.lift()
+            self.win.focus_force()
+
+        except Exception:
+            pass
+
+
     # ARRASTAR JANELA
     # ========================================================
 
@@ -706,6 +748,148 @@ class HomeWindow:
 
 
         # ====================================================
+        # NOTIFICACOES
+        # ====================================================
+
+        self._divider(
+            shell
+        ).pack(
+            fill="x",
+        )
+
+        notification_bar = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+            height=68,
+        )
+
+        notification_bar.pack(
+            fill="x",
+            padx=13,
+            pady=(7, 6),
+        )
+
+        notification_bar.pack_propagate(
+            False
+        )
+
+        notification_icon = (
+            self._icon_box(
+                notification_bar,
+                "!",
+                self.colors["ext_bg"],
+                self.colors["ext_fg"],
+            )
+        )
+
+        notification_icon.pack(
+            side="left",
+            padx=(2, 10),
+        )
+
+        notification_text = ctk.CTkFrame(
+            notification_bar,
+            fg_color="transparent",
+        )
+
+        notification_text.pack(
+            side="left",
+            fill="both",
+            expand=True,
+        )
+
+        title_line = ctk.CTkFrame(
+            notification_text,
+            fg_color="transparent",
+        )
+
+        title_line.pack(
+            fill="x",
+            pady=(7, 0),
+        )
+
+        ctk.CTkLabel(
+            title_line,
+            text="Notificações",
+            text_color=self.colors["text"],
+            anchor="w",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+        ).pack(
+            side="left",
+        )
+
+        self.notification_count = (
+            ctk.CTkLabel(
+                title_line,
+                text="0 novas",
+                text_color=self.colors[
+                    "accent"
+                ],
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                    weight="bold",
+                ),
+            )
+        )
+
+        self.notification_count.pack(
+            side="left",
+            padx=(8, 0),
+        )
+
+        self.notification_description = (
+            ctk.CTkLabel(
+                notification_text,
+                text="Nenhuma notificação",
+                text_color=self.colors[
+                    "dim"
+                ],
+                anchor="w",
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                ),
+            )
+        )
+
+        self.notification_description.pack(
+            fill="x",
+            pady=(2, 0),
+        )
+
+        ctk.CTkButton(
+            notification_bar,
+            text="Ver histórico",
+            width=92,
+            height=29,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color=self.colors[
+                "button_hover"
+            ],
+            border_width=1,
+            border_color=self.colors[
+                "border"
+            ],
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+            command=self._open_notifications,
+        ).pack(
+            side="right",
+            padx=(8, 2),
+        )
+
+
+        # ====================================================
         # FOOTER
         # ====================================================
 
@@ -851,6 +1035,84 @@ class HomeWindow:
             "description"
         ].configure(
             text="O feito e o que falta"
+        )
+
+
+        # ----------------------------------------------------
+        # NOTIFICACOES
+        # ----------------------------------------------------
+
+        manager = getattr(
+            self.comp,
+            "notifications",
+            None,
+        )
+
+        nao_lidas = 0
+        ultima = None
+
+        if manager is not None:
+            try:
+                nao_lidas = (
+                    manager
+                    .quantidade_nao_lidas()
+                )
+
+                recentes = manager.listar(
+                    limite=1
+                )
+
+                if recentes:
+                    ultima = recentes[0]
+
+            except Exception:
+                pass
+
+        self.notification_count.configure(
+            text=(
+                "1 nova"
+                if nao_lidas == 1
+                else f"{nao_lidas} novas"
+            )
+        )
+
+        if ultima:
+            origem = str(
+                ultima.get(
+                    "origem",
+                    "MARVIN",
+                )
+            )
+
+            criada = str(
+                ultima.get(
+                    "criada_em",
+                    "",
+                )
+            )
+
+            hora = (
+                criada[11:16]
+                if len(criada) >= 16
+                else ""
+            )
+
+            descricao = (
+                f"Último aviso: {origem}"
+            )
+
+            if hora:
+                descricao += (
+                    f" ? {hora}"
+                )
+
+        else:
+            descricao = (
+                "Nenhuma notificação"
+            )
+
+        self.notification_description.configure(
+            text=descricao
         )
 
 
