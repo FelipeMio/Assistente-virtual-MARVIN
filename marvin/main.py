@@ -6947,16 +6947,41 @@ class SnoozeWindow:
 
 
     def _close_if_focus_lost(self):
+        """
+        Fecha a janela somente quando o foco
+        realmente sair do SnoozeWindow.
 
+        Trocar o foco entre botoes e outros
+        widgets filhos nao deve fechar a janela.
+        """
         try:
             focus = self.win.focus_get()
 
+            # Sem foco dentro da aplicacao.
             if focus is None:
-                self._cancel()
+                self._close()
+                return
+
+            try:
+                focus_window = (
+                    focus.winfo_toplevel()
+                )
+            except Exception:
+                focus_window = None
+
+            # Se o widget focado pertence a esta
+            # mesma Toplevel, continua aberta.
+            if focus_window == self.win:
+                return
+
+            self._close()
+
+        except tk.TclError:
+            # A janela pode ja ter sido destruida.
+            pass
 
         except Exception:
-            self._cancel()
-
+            pass
 
     def _task_is_current(self):
         """Confirma que esta janela ainda controla o lembrete atual."""
@@ -7166,6 +7191,11 @@ class MarvinCompanion:
 
         # Controle exclusivo do modo compacto.
         self._compact_drag_active = False
+
+        # ID do unico callback pendente do
+        # loop de arraste do modo compacto.
+        self._compact_drag_job = None
+
         self._compact_drag_offset_x = 0
         self._compact_drag_start = None
         self._compact_has_position = False
@@ -7213,6 +7243,18 @@ class MarvinCompanion:
         self.cv.bind("<B1-Motion>",       self._drag_move)
         self.cv.bind("<ButtonRelease-1>", self._drag_end)
         self.cv.bind("<Button-3>",         self._on_click)
+
+        # Atualiza o hover dos botoes do balao
+        # enquanto o mouse se move.
+        self.cv.bind(
+            "<Motion>",
+            self._on_mouse_motion,
+        )
+
+        self.cv.bind(
+            "<Leave>",
+            self._on_mouse_leave,
+        )
 
         self.root.protocol("WM_DELETE_WINDOW", self._hide_marvin)
         self.root.bind_all("<Control-Shift-N>",
@@ -7931,6 +7973,22 @@ class MarvinCompanion:
         Arraste global: continua funcionando mesmo quando
         o mouse sai da janela e atravessa para outro monitor.
         """
+
+        # Garante que exista apenas um callback
+        # de arraste pendente por vez.
+        if self._compact_drag_job is not None:
+            try:
+                self.root.after_cancel(
+                    self._compact_drag_job
+                )
+            except Exception:
+                pass
+
+            self._compact_drag_job = None
+
+        if not self._compact_drag_active:
+            return
+
         if (
             not self._compact_drag_active
             or not self._compact_mode
@@ -8001,9 +8059,11 @@ class MarvinCompanion:
             self.COMPACT_H
         )
 
-        self.root.after(
-            16,
-            self._compact_drag_tick
+        self._compact_drag_job = (
+            self.root.after(
+                16,
+                self._compact_drag_tick,
+            )
         )
 
 
@@ -9246,6 +9306,36 @@ class MarvinCompanion:
         self.root.geometry(
             f"+{x}+{y}"
         )
+
+
+    def _on_mouse_motion(
+        self,
+        event,
+    ):
+        # Durante um arraste nao precisamos
+        # calcular hover dos botoes do balao.
+        if getattr(
+            self,
+            "_dragging",
+            False,
+        ):
+            return
+
+        hover = self._bubble_button_at(
+            event.x,
+            event.y,
+        )
+
+        if hover != self._bubble_hover:
+            self._bubble_hover = hover
+
+
+    def _on_mouse_leave(
+        self,
+        event=None,
+    ):
+        if self._bubble_hover is not None:
+            self._bubble_hover = None
 
 
     def _bubble_button_at(self, x, y):
