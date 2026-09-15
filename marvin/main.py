@@ -515,6 +515,30 @@ _IDLE_MSGS = [
     
 ]
 
+IDLE_FREQUENCY_OPTIONS = {
+    "Nunca": 0,
+    "1 minuto": 60,
+    "5 minutos": 300,
+    "15 minutos": 900,
+    "30 minutos": 1800,
+}
+
+
+def _idle_frequency_label(seconds):
+    try:
+        seconds = int(seconds)
+    except (TypeError, ValueError):
+        seconds = 300
+
+    for label, value in (
+        IDLE_FREQUENCY_OPTIONS.items()
+    ):
+        if value == seconds:
+            return label
+
+    return "5 minutos"
+
+
 def _frases_idle_ativas():
     """
     Retorna as frases personalizadas do MARVIN.
@@ -5030,6 +5054,83 @@ class SettingsWindow:
             fill="x"
         )
 
+
+        ctk.CTkLabel(
+            body,
+            text="Frequ\u00eancia das falas",
+            anchor="w",
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+        ).pack(
+            fill="x",
+            pady=(14, 3),
+        )
+
+
+        ctk.CTkLabel(
+            body,
+            text=(
+                "Define com que frequ\u00eancia "
+                "o Marvin fala sozinho."
+            ),
+            anchor="w",
+            text_color=self.colors["dim"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+        ).pack(
+            fill="x",
+            pady=(0, 6),
+        )
+
+
+        self.v_idle_frequency = tk.StringVar(
+            value=_idle_frequency_label(
+                cfg.get(
+                    "idle_interval_seconds",
+                    300,
+                )
+            )
+        )
+
+
+        self.idle_frequency_menu = (
+            ctk.CTkOptionMenu(
+                body,
+                values=list(
+                    IDLE_FREQUENCY_OPTIONS.keys()
+                ),
+                variable=self.v_idle_frequency,
+                height=34,
+                corner_radius=8,
+                fg_color=self.colors["surface"],
+                button_color=self.colors["accent"],
+                button_hover_color=self.colors[
+                    "accent_hover"
+                ],
+                text_color=self.colors["text"],
+                dropdown_fg_color=self.colors[
+                    "surface"
+                ],
+                dropdown_text_color=self.colors[
+                    "text"
+                ],
+                dropdown_hover_color=self.colors[
+                    "accent_hover"
+                ],
+            )
+        )
+
+        self.idle_frequency_menu.pack(
+            fill="x",
+            pady=(0, 4),
+        )
+
         frases_atuais = cfg.get(
             "frases_idle",
             _IDLE_MSGS
@@ -5316,7 +5417,21 @@ class SettingsWindow:
             else list(_IDLE_MSGS)
         )
 
+        cfg["idle_interval_seconds"] = (
+            IDLE_FREQUENCY_OPTIONS.get(
+                self.v_idle_frequency.get(),
+                300,
+            )
+        )
+
         save_cfg(cfg)
+
+        # Aplica a nova frequencia imediatamente.
+        try:
+            self.comp._schedule_idle()
+        except Exception:
+            pass
+
 
         tema_mudou = (
             tema_anterior
@@ -7941,7 +8056,7 @@ class MarvinCompanion:
         
 
         # Frases idle
-        self._idle_interval  = 45000
+        self._idle_job = None
         self._schedule_idle()
 
         # Eventos
@@ -9700,21 +9815,86 @@ class MarvinCompanion:
 
     # ── Idle aleatorio ────────────────────────────────────────────────────────
 
+    def _idle_interval_ms(self):
+        """
+        Retorna o intervalo configurado das
+        falas espontaneas em milissegundos.
+
+        Zero significa desativado.
+        """
+        try:
+            seconds = int(
+                cfg.get(
+                    "idle_interval_seconds",
+                    300,
+                )
+            )
+        except (TypeError, ValueError):
+            seconds = 300
+
+        return max(
+            0,
+            seconds,
+        ) * 1000
+
+
     def _schedule_idle(self):
-        self.root.after(self._idle_interval, self._idle_msg)
+        """
+        Mantem somente um timer idle ativo.
+        """
+
+        old_job = getattr(
+            self,
+            "_idle_job",
+            None,
+        )
+
+        if old_job is not None:
+            try:
+                self.root.after_cancel(
+                    old_job
+                )
+            except Exception:
+                pass
+
+            self._idle_job = None
+
+        interval = (
+            self._idle_interval_ms()
+        )
+
+        if interval <= 0:
+            return
+
+        self._idle_job = (
+            self.root.after(
+                interval,
+                self._idle_msg,
+            )
+        )
 
     def _idle_msg(self):
-        if self.state == "idle" and not self.bubble:
+        self._idle_job = None
+
+        if self._idle_interval_ms() <= 0:
+            return
+
+        if (
+            self.state == "idle"
+            and not self.bubble
+        ):
             self._bubble_mode = "normal"
             self._bubble_hover = None
-            self.say(
-                random.choice(_frases_idle_ativas()),
-                "talking",
-                10000
-            )
-        self._schedule_idle()
 
-    # ── Fala ──────────────────────────────────────────────────────────────────
+            self.say(
+                random.choice(
+                    _frases_idle_ativas()
+                ),
+                "talking",
+                10000,
+            )
+
+        self._schedule_idle()
 
     def say(self, text, state="talking", duration=4000):
         self.bubble = text
