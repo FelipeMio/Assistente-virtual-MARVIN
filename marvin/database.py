@@ -64,6 +64,35 @@ def _migrate():
             "ADD COLUMN hora_base TEXT DEFAULT NULL"
         )
 
+    # Historico permanente de conclusoes.
+    #
+    # A tabela tarefas guarda apenas o estado atual.
+    # Esta tabela guarda cada evento de conclusao,
+    # inclusive de tarefas recorrentes.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historico_conclusoes (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarefa_id     INTEGER NOT NULL,
+            texto         TEXT    NOT NULL,
+            recorrencia   TEXT    DEFAULT 'Nunca',
+            prioridade    TEXT    DEFAULT 'Normal',
+            concluido_em  TEXT    NOT NULL,
+            UNIQUE(tarefa_id, concluido_em)
+        )
+    """)
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS "
+        "idx_historico_concluido_em "
+        "ON historico_conclusoes(concluido_em)"
+    )
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS "
+        "idx_historico_tarefa_id "
+        "ON historico_conclusoes(tarefa_id)"
+    )
+
     # Tarefas antigas passam a usar sua data/hora atual
     # como programacao original.
     cursor.execute(
@@ -77,6 +106,40 @@ def _migrate():
         "SET hora_base=hora "
         "WHERE hora_base IS NULL OR hora_base=''"
     )
+
+    # Backfill do historico antigo.
+    #
+    # Para tarefas comuns recuperamos a conclusao
+    # existente. Para tarefas recorrentes somente
+    # a ultima conclusao ainda esta disponivel no
+    # banco antigo, portanto e a unica recuperavel.
+    cursor.execute("""
+        INSERT OR IGNORE INTO historico_conclusoes (
+            tarefa_id,
+            texto,
+            recorrencia,
+            prioridade,
+            concluido_em
+        )
+        SELECT
+            id,
+            texto,
+            recorrencia,
+            CASE
+                WHEN prioridade IN (
+                    'Nenhuma',
+                    'Baixa',
+                    'Normal',
+                    'Alta'
+                )
+                THEN prioridade
+                ELSE 'Normal'
+            END,
+            concluido_em
+        FROM tarefas
+        WHERE concluido_em IS NOT NULL
+          AND concluido_em <> ''
+    """)
 
     con.commit()
 
@@ -280,7 +343,9 @@ def db_concluir(tid):
 
     with _db_lock:
         cursor.execute(
-            "SELECT data,hora,recorrencia,data_base,hora_base "
+            "SELECT "
+            "data,hora,recorrencia,data_base,hora_base,"
+            "texto,prioridade "
             "FROM tarefas WHERE id=?",
             (tid,),
         )
@@ -296,7 +361,25 @@ def db_concluir(tid):
             recorrencia,
             data_base,
             hora_base,
+            texto,
+            prioridade,
         ) = row
+
+        # Registra o evento antes de avancar ou
+        # finalizar a tarefa. INSERT OR IGNORE
+        # protege contra duplicacao acidental.
+        cursor.execute(
+            "INSERT OR IGNORE INTO historico_conclusoes "
+            "(tarefa_id,texto,recorrencia,prioridade,concluido_em) "
+            "VALUES (?,?,?,?,?)",
+            (
+                tid,
+                texto,
+                recorrencia,
+                prioridade or "Normal",
+                agora,
+            ),
+        )
 
         # Tarefa comum: comportamento antigo.
         if recorrencia == "Nunca":
@@ -347,11 +430,38 @@ def db_concluir(tid):
 def db_desconcluir(tid):
     with _db_lock:
         cursor.execute(
+            "SELECT concluido_em "
+            "FROM tarefas WHERE id=?",
+            (tid,),
+        )
+
+        row = cursor.fetchone()
+
+        concluido_em = (
+            row[0]
+            if row
+            else None
+        )
+
+        cursor.execute(
             "UPDATE tarefas "
             "SET concluida=0, concluido_em=NULL "
             "WHERE id=?",
             (tid,),
         )
+
+        # Desmarcar uma tarefa concluida desfaz
+        # tambem o evento correspondente.
+        if concluido_em:
+            cursor.execute(
+                "DELETE FROM historico_conclusoes "
+                "WHERE tarefa_id=? "
+                "AND concluido_em=?",
+                (
+                    tid,
+                    concluido_em,
+                ),
+            )
 
         con.commit()
 
@@ -439,18 +549,60 @@ def db_adiar(tid, nova_data, nova_hora):
 
 
 def db_streak_hoje():
-    hoje = datetime.date.today().strftime("%Y-%m-%d")
+    hoje = datetime.date.today().strftime(
+        "%Y-%m-%d"
+    )
 
     with _db_lock:
         cursor.execute(
-            "SELECT COUNT(*) FROM tarefas "
-            "WHERE ativo=1 "
-            "AND concluido_em IS NOT NULL "
-            "AND substr(concluido_em,1,10)=?",
+            "SELECT COUNT(*) "
+            "FROM historico_conclusoes "
+            "WHERE substr(concluido_em,1,10)=?",
             (hoje,),
         )
 
         return cursor.fetchone()[0]
+
+
+def db_historico_conclusoes(
+    limite=100
+):
+    """
+    Retorna as conclusoes mais recentes.
+
+    Campos:
+    id,
+    tarefa_id,
+    texto,
+    recorrencia,
+    prioridade,
+    concluido_em
+    """
+    try:
+        limite = int(limite)
+    except (TypeError, ValueError):
+        limite = 100
+
+    limite = max(
+        1,
+        min(
+            limite,
+            1000,
+        ),
+    )
+
+    with _db_lock:
+        cursor.execute(
+            "SELECT "
+            "id,tarefa_id,texto,recorrencia,"
+            "prioridade,concluido_em "
+            "FROM historico_conclusoes "
+            "ORDER BY concluido_em DESC,id DESC "
+            "LIMIT ?",
+            (limite,),
+        )
+
+        return cursor.fetchall()
 
 
 def db_limpar_antigas(dias=30):
