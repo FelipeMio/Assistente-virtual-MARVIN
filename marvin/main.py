@@ -6566,7 +6566,10 @@ class InteractionPanel:
 class SnoozeWindow:
 
     WIDTH = 270
-    HEIGHT = 330
+    HEIGHT = 380
+
+    CUSTOM_WIDTH = 300
+    CUSTOM_HEIGHT = 320
 
     OPTS = [
         ("5 minutos", 5),
@@ -6584,6 +6587,9 @@ class SnoozeWindow:
         self.root = root
         self.comp = companion
         self.task = task
+
+        self.custom_win = None
+        self._custom_open = False
 
         # Guarda o balao atual para poder restaura-lo
         # caso o usuario cancele o adiamento.
@@ -6913,6 +6919,46 @@ class SnoozeWindow:
 
         ctk.CTkButton(
             shell,
+
+            text="Outro horário...",
+
+            height=34,
+
+            corner_radius=8,
+
+            fg_color="transparent",
+
+            hover_color=self.colors[
+                "orange_bg"
+            ],
+
+            border_width=1,
+
+            border_color=self.colors[
+                "accent"
+            ],
+
+            text_color=self.colors[
+                "accent"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+            command=self._open_custom,
+
+        ).pack(
+            fill="x",
+            padx=16,
+            pady=(8, 0),
+        )
+
+
+        ctk.CTkButton(
+            shell,
             text="Cancelar",
             height=30,
             corner_radius=7,
@@ -6954,6 +7000,9 @@ class SnoozeWindow:
         Trocar o foco entre botoes e outros
         widgets filhos nao deve fechar a janela.
         """
+        if self._custom_open:
+            return
+
         try:
             focus = self.win.focus_get()
 
@@ -6982,6 +7031,611 @@ class SnoozeWindow:
 
         except Exception:
             pass
+
+    def _open_custom(self):
+        """
+        Abre uma janela para escolher uma data
+        e horario especificos para o lembrete.
+        """
+
+        if not self._task_is_current():
+            self._close()
+            return
+
+        if (
+            self.custom_win is not None
+            and self.custom_win.winfo_exists()
+        ):
+            try:
+                self.custom_win.lift()
+                self.custom_win.focus_force()
+            except Exception:
+                pass
+
+            return
+
+        self._custom_open = True
+
+        # Uma hora a partir de agora e um bom
+        # valor inicial para o formulario.
+        default_dt = (
+            datetime.datetime.now()
+            + datetime.timedelta(hours=1)
+        )
+
+        self.custom_win = (
+            ctk.CTkToplevel(
+                self.root
+            )
+        )
+
+        win = self.custom_win
+
+        win.geometry(
+            f"{self.CUSTOM_WIDTH}"
+            f"x{self.CUSTOM_HEIGHT}"
+        )
+
+        win.resizable(
+            False,
+            False,
+        )
+
+        win.overrideredirect(
+            True
+        )
+
+        win.attributes(
+            "-topmost",
+            True,
+        )
+
+        win.configure(
+            fg_color=self.colors[
+                "bg"
+            ]
+        )
+
+        shell = ctk.CTkFrame(
+            win,
+
+            fg_color=self.colors[
+                "card"
+            ],
+
+            corner_radius=16,
+
+            border_width=1,
+
+            border_color=self.colors[
+                "border"
+            ],
+        )
+
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=2,
+            pady=2,
+        )
+
+
+        # --------------------------------------------
+        # CABECALHO
+        # --------------------------------------------
+
+        header = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        header.pack(
+            fill="x",
+            padx=16,
+            pady=(15, 5),
+        )
+
+        title_wrap = ctk.CTkFrame(
+            header,
+            fg_color="transparent",
+        )
+
+        title_wrap.pack(
+            side="left",
+            fill="x",
+            expand=True,
+        )
+
+        ctk.CTkLabel(
+            title_wrap,
+
+            text="Adiar para",
+
+            anchor="w",
+
+            text_color=self.colors[
+                "text"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=13,
+                weight="bold",
+            ),
+
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkLabel(
+            title_wrap,
+
+            text=(
+                "Escolha a data e o "
+                "horário do lembrete"
+            ),
+
+            anchor="w",
+
+            text_color=self.colors[
+                "dim"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=8,
+            ),
+
+        ).pack(
+            fill="x"
+        )
+
+        ctk.CTkButton(
+            header,
+
+            text="×",
+
+            width=30,
+            height=30,
+
+            corner_radius=8,
+
+            fg_color="transparent",
+
+            hover_color=self.colors[
+                "hover"
+            ],
+
+            text_color=self.colors[
+                "dim"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=18,
+            ),
+
+            command=self._close_custom,
+
+        ).pack(
+            side="right",
+            padx=(6, 0),
+        )
+
+
+        # --------------------------------------------
+        # FORMULARIO
+        # --------------------------------------------
+
+        form = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        form.pack(
+            fill="x",
+            padx=18,
+            pady=(14, 0),
+        )
+
+
+        ctk.CTkLabel(
+            form,
+
+            text="Data",
+
+            anchor="w",
+
+            text_color=self.colors[
+                "dim"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+        ).pack(
+            fill="x",
+            pady=(0, 4),
+        )
+
+
+        self._custom_date_var = (
+            tk.StringVar(
+                value=default_dt.strftime(
+                    "%d/%m/%Y"
+                )
+            )
+        )
+
+
+        self._custom_date_entry = (
+            ctk.CTkEntry(
+                form,
+
+                textvariable=(
+                    self._custom_date_var
+                ),
+
+                height=36,
+
+                corner_radius=8,
+
+                border_width=1,
+
+                border_color=self.colors[
+                    "border"
+                ],
+
+                fg_color=self.colors[
+                    "bg"
+                ],
+
+                text_color=self.colors[
+                    "text"
+                ],
+
+                placeholder_text=(
+                    "DD/MM/AAAA"
+                ),
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                ),
+            )
+        )
+
+        self._custom_date_entry.pack(
+            fill="x",
+        )
+
+
+        ctk.CTkLabel(
+            form,
+
+            text="Horário",
+
+            anchor="w",
+
+            text_color=self.colors[
+                "dim"
+            ],
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+        ).pack(
+            fill="x",
+            pady=(10, 4),
+        )
+
+
+        self._custom_time_var = (
+            tk.StringVar(
+                value=default_dt.strftime(
+                    "%H:%M"
+                )
+            )
+        )
+
+
+        self._custom_time_entry = (
+            ctk.CTkEntry(
+                form,
+
+                textvariable=(
+                    self._custom_time_var
+                ),
+
+                height=36,
+
+                corner_radius=8,
+
+                border_width=1,
+
+                border_color=self.colors[
+                    "border"
+                ],
+
+                fg_color=self.colors[
+                    "bg"
+                ],
+
+                text_color=self.colors[
+                    "text"
+                ],
+
+                placeholder_text="HH:MM",
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                ),
+            )
+        )
+
+        self._custom_time_entry.pack(
+            fill="x",
+        )
+
+
+        self._custom_error = (
+            ctk.CTkLabel(
+                form,
+
+                text="",
+
+                anchor="w",
+
+                text_color=self.colors[
+                    "accent"
+                ],
+
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=8,
+                ),
+            )
+        )
+
+        self._custom_error.pack(
+            fill="x",
+            pady=(5, 0),
+        )
+
+
+        # --------------------------------------------
+        # ACOES
+        # --------------------------------------------
+
+        actions = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
+        )
+
+        actions.pack(
+            fill="x",
+            padx=18,
+            pady=(8, 15),
+        )
+
+        actions.grid_columnconfigure(
+            0,
+            weight=1,
+        )
+
+        actions.grid_columnconfigure(
+            1,
+            weight=1,
+        )
+
+
+        ctk.CTkButton(
+            actions,
+
+            text="Voltar",
+
+            height=34,
+
+            corner_radius=8,
+
+            fg_color="transparent",
+
+            hover_color=self.colors[
+                "hover"
+            ],
+
+            border_width=1,
+
+            border_color=self.colors[
+                "border"
+            ],
+
+            text_color=self.colors[
+                "text"
+            ],
+
+            command=self._close_custom,
+
+        ).grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=(0, 4),
+        )
+
+
+        ctk.CTkButton(
+            actions,
+
+            text="Adiar",
+
+            height=34,
+
+            corner_radius=8,
+
+            fg_color=self.colors[
+                "accent"
+            ],
+
+            hover_color=self.colors[
+                "accent_hover"
+            ],
+
+            text_color="#FFFFFF",
+
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+                weight="bold",
+            ),
+
+            command=self._apply_custom,
+
+        ).grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(4, 0),
+        )
+
+
+        win.bind(
+            "<Escape>",
+            lambda e:
+                self._close_custom()
+        )
+
+        win.bind(
+            "<Return>",
+            lambda e:
+                self._apply_custom()
+        )
+
+
+        # Esconde a janela de opcoes rapidas
+        # enquanto a personalizada estiver ativa.
+        try:
+            self.win.withdraw()
+        except Exception:
+            pass
+
+
+        _position_near_marvin(
+            win,
+            self.comp,
+        )
+
+        win.lift()
+        win.focus_force()
+
+        try:
+            self._custom_date_entry.focus_set()
+            self._custom_date_entry.select_range(
+                0,
+                "end",
+            )
+        except Exception:
+            pass
+
+
+    def _close_custom(self):
+        """
+        Fecha somente o formulario personalizado
+        e retorna para as opcoes rapidas.
+        """
+
+        win = self.custom_win
+
+        self.custom_win = None
+        self._custom_open = False
+
+        if win is not None:
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        try:
+            if self.win.winfo_exists():
+                self.win.deiconify()
+
+                _position_near_marvin(
+                    self.win,
+                    self.comp,
+                )
+
+                self.win.lift()
+                self.win.focus_force()
+
+        except Exception:
+            pass
+
+
+    def _apply_custom(self):
+        """
+        Valida data/hora e aplica o adiamento.
+        """
+
+        if not self._task_is_current():
+            self._close()
+            return
+
+        data_text = (
+            self._custom_date_var
+            .get()
+            .strip()
+        )
+
+        hora_text = (
+            self._custom_time_var
+            .get()
+            .strip()
+        )
+
+        try:
+            new_dt = (
+                datetime.datetime.strptime(
+                    (
+                        f"{data_text} "
+                        f"{hora_text}"
+                    ),
+                    "%d/%m/%Y %H:%M",
+                )
+            )
+
+        except ValueError:
+            self._custom_error.configure(
+                text=(
+                    "Use DD/MM/AAAA "
+                    "e HH:MM."
+                )
+            )
+            return
+
+
+        agora = datetime.datetime.now()
+
+        if new_dt <= agora:
+            self._custom_error.configure(
+                text=(
+                    "Escolha um horário "
+                    "no futuro."
+                )
+            )
+            return
+
+
+        self._snooze_at(
+            new_dt
+        )
+
 
     def _task_is_current(self):
         """Confirma que esta janela ainda controla o lembrete atual."""
@@ -7023,6 +7677,20 @@ class SnoozeWindow:
 
     def _close(self):
 
+        self._custom_open = False
+
+        custom_win = (
+            self.custom_win
+        )
+
+        self.custom_win = None
+
+        if custom_win is not None:
+            try:
+                custom_win.destroy()
+            except Exception:
+                pass
+
         try:
             self.win.destroy()
 
@@ -7035,9 +7703,6 @@ class SnoozeWindow:
         minutes
     ):
 
-        # A janela pode ter ficado aberta enquanto
-        # a tarefa foi resolvida por outra interface.
-        # Nesse caso nao toca mais no banco.
         if not self._task_is_current():
             self._close()
             return
@@ -7049,29 +7714,70 @@ class SnoozeWindow:
             )
         )
 
+        self._snooze_at(
+            new_dt
+        )
+
+
+    def _snooze_at(
+        self,
+        new_dt,
+    ):
+        """
+        Aplica um datetime absoluto de adiamento.
+
+        Tanto as opcoes rapidas quanto o horario
+        personalizado passam por este metodo.
+        """
+
+        if not self._task_is_current():
+            self._close()
+            return
+
         if self.task:
             db_adiar(
                 self.task[0],
+
                 new_dt.strftime(
                     "%Y-%m-%d"
                 ),
+
                 new_dt.strftime(
                     "%H:%M"
-                )
+                ),
             )
 
         self.comp._next_reminder()
 
-        self.comp.say(
-            (
+
+        hoje = (
+            datetime.datetime.now()
+            .date()
+        )
+
+        if new_dt.date() == hoje:
+            mensagem = (
                 "Adiado para "
                 f"{new_dt.strftime('%H:%M')}."
-            ),
+            )
+
+        else:
+            mensagem = (
+                "Adiado para "
+                f"{new_dt.strftime('%d/%m')} "
+                "às "
+                f"{new_dt.strftime('%H:%M')}."
+            )
+
+
+        self.comp.say(
+            mensagem,
             "talking",
-            3000
+            3000,
         )
 
         self._close()
+
 
 
 
