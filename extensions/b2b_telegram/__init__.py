@@ -1,6 +1,7 @@
 ﻿import json
 import queue
 import sys
+import time
 from collections import deque
 from pathlib import Path
 
@@ -146,13 +147,69 @@ def iniciar_extensao(comp):
         )
 
     def limpar_balao():
+        """
+        Encerra o aviso visual do B2B.
+
+        Se ja existir um lembrete de tarefa
+        pendente, devolve o controle visual
+        para esse lembrete.
+
+        Caso contrario, MARVIN volta ao idle.
+        """
         try:
-            if not comp._reminder_queue:
+            fila = getattr(
+                comp,
+                "_reminder_queue",
+                [],
+            )
+
+            if fila:
+                tarefa = fila[0]
+
+                try:
+                    titulo = tarefa[1]
+                except Exception:
+                    titulo = "tarefa pendente"
+
+                comp._bubble_mode = "alert"
+                comp._bubble_hover = None
+
+                comp.state = "alert"
+                comp.b_timer = 0
+                comp.bubble = (
+                    f"Hora de: {titulo}"
+                )
+
+                # Reinicia a contagem da
+                # reacao de espera do lembrete.
+                if hasattr(
+                    comp,
+                    "_reminder_started_at",
+                ):
+                    comp._reminder_started_at = (
+                        time.monotonic()
+                    )
+
+                if hasattr(
+                    comp,
+                    "_waiting_reaction_stage",
+                ):
+                    comp._waiting_reaction_stage = 0
+
+            else:
+                comp._bubble_mode = "normal"
+                comp._bubble_hover = None
+
                 comp.bubble = ""
                 comp.b_timer = 0
                 comp.state = "idle"
-        except Exception:
-            pass
+
+        except Exception as exc:
+            print(
+                "[B2B Telegram] "
+                "Erro ao limpar aviso: "
+                f"{exc}"
+            )
 
     def entendi():
         notification_id = estado.get(
