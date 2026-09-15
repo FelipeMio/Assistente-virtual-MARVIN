@@ -8110,167 +8110,128 @@ class MarvinCompanion:
         self._compact_frame_index = 0
 
 
-    def _load_idle_frames(self):
+    def _load_frames(
+        self,
+        subfolder,
+        filenames,
+        label,
+        missing_label=None,
+    ):
+        """
+        Carrega uma sequencia de sprites do MARVIN.
+
+        Todos os frames usam o mesmo tamanho,
+        conversao RGBA e redimensionamento NEAREST.
+        """
         pasta = (
             Path(__file__).resolve().parent
             / "assets"
             / "marvin"
-            / "idle"
+            / subfolder
         )
-
-        arquivos = [
-            pasta / "01.png",
-            pasta / "02.png",
-        ]
 
         frames = []
 
-        for arquivo in arquivos:
-            if not arquivo.exists():
-                print(f"[MARVIN] Sprite nao encontrado: {arquivo}")
-                continue
-
-            imagem = Image.open(arquivo).convert("RGBA")
-
-            tamanho = self._normal_sprite_size()
-
-            imagem = imagem.resize(
-                (tamanho, tamanho),
-                Image.Resampling.NEAREST
+        for filename in filenames:
+            arquivo = (
+                pasta
+                / filename
             )
 
-            frame = ImageTk.PhotoImage(imagem)
-            frames.append(frame)
-
-        print(
-            f"[MARVIN] {len(frames)} frame(s) idle carregado(s)."
-        )
-
-        return frames
-
-    def _load_alert_frames(self):
-        pasta = (
-            Path(__file__).resolve().parent
-            / "assets"
-            / "marvin"
-            / "alert"
-        )
-
-        arquivos = [
-            pasta / "01.png",
-            pasta / "02.png",
-        ]
-
-        frames = []
-
-        for arquivo in arquivos:
             if not arquivo.exists():
-                print(f"[MARVIN] Sprite de alerta nao encontrado: {arquivo}")
-                continue
+                descricao = (
+                    missing_label
+                    or f"Sprite {label}"
+                )
 
-            imagem = Image.open(arquivo).convert("RGBA")
-
-            tamanho = self._normal_sprite_size()
-
-            imagem = imagem.resize(
-                (tamanho, tamanho),
-                Image.Resampling.NEAREST
-            )
-
-            frame = ImageTk.PhotoImage(imagem)
-            frames.append(frame)
-
-        print(
-            f"[MARVIN] {len(frames)} frame(s) alert carregado(s)."
-        )
-
-        return frames
-
-
-    def _load_waiting_frames(self):
-        pasta = (
-            Path(__file__).resolve().parent
-            / "assets"
-            / "marvin"
-            / "waiting"
-        )
-
-        arquivos = [
-            pasta / "01.png",
-            pasta / "02.png",
-            pasta / "03.png",
-        ]
-
-        frames = []
-
-        for arquivo in arquivos:
-            if not arquivo.exists():
                 print(
-                    f"[MARVIN] Sprite waiting nao encontrado: {arquivo}"
+                    f"[MARVIN] "
+                    f"{descricao} nao encontrado: "
+                    f"{arquivo}"
                 )
                 continue
 
             imagem = Image.open(
                 arquivo
-            ).convert("RGBA")
+            ).convert(
+                "RGBA"
+            )
 
-            tamanho = self._normal_sprite_size()
+            tamanho = (
+                self._normal_sprite_size()
+            )
 
             imagem = imagem.resize(
-                (tamanho, tamanho),
-                Image.Resampling.NEAREST
+                (
+                    tamanho,
+                    tamanho,
+                ),
+                Image.Resampling.NEAREST,
             )
 
             frames.append(
-                ImageTk.PhotoImage(imagem)
+                ImageTk.PhotoImage(
+                    imagem
+                )
             )
 
         print(
-            f"[MARVIN] {len(frames)} frame(s) waiting carregado(s)."
+            f"[MARVIN] "
+            f"{len(frames)} frame(s) "
+            f"{label} carregado(s)."
         )
 
         return frames
 
+
+    def _load_idle_frames(self):
+        return self._load_frames(
+            "idle",
+            (
+                "01.png",
+                "02.png",
+            ),
+            label="idle",
+            missing_label="Sprite",
+        )
+
+    def _load_alert_frames(self):
+        return self._load_frames(
+            "alert",
+            (
+                "01.png",
+                "02.png",
+            ),
+            label="alert",
+            missing_label=(
+                "Sprite de alerta"
+            ),
+        )
+
+    def _load_waiting_frames(self):
+        return self._load_frames(
+            "waiting",
+            (
+                "01.png",
+                "02.png",
+                "03.png",
+            ),
+            label="waiting",
+            missing_label=(
+                "Sprite waiting"
+            ),
+        )
 
     def _load_yawn_frames(self):
-        pasta = (
-            Path(__file__).resolve().parent
-            / "assets"
-            / "marvin"
-            / "yawn"
+        return self._load_frames(
+            "yawn",
+            (
+                "01.png",
+                "02.png",
+            ),
+            label="yawn",
+            missing_label="Sprite yawn",
         )
-
-        arquivos = [
-            pasta / "01.png",
-            pasta / "02.png",
-        ]
-
-        frames = []
-
-        for arquivo in arquivos:
-            if not arquivo.exists():
-                print(f"[MARVIN] Sprite yawn nao encontrado: {arquivo}")
-                continue
-
-            imagem = Image.open(arquivo).convert("RGBA")
-
-            tamanho = self._normal_sprite_size()
-
-            imagem = imagem.resize(
-                (tamanho, tamanho),
-                Image.Resampling.NEAREST
-            )
-
-            frames.append(
-                ImageTk.PhotoImage(imagem)
-            )
-
-        print(
-            f"[MARVIN] {len(frames)} frame(s) yawn carregado(s)."
-        )
-
-        return frames
-
 
     def _load_compact_frames(self):
         pasta = (
@@ -8586,8 +8547,10 @@ class MarvinCompanion:
     def _update_waiting_reaction(self):
         """Atualiza a fala enquanto o lembrete e ignorado."""
 
+        atual = self._peek_reminder()
+
         if (
-            not self._reminder_queue
+            atual is None
             or self._bubble_mode != "alert"
             or self._reminder_started_at is None
         ):
@@ -8623,15 +8586,11 @@ class MarvinCompanion:
         if stage == 0:
             return
 
-        tarefa = (
-            self._reminder_queue[0][1]
-        )
+        tarefa = atual[1]
 
-        defaults = [
-            "Ei... {tarefa}",
-            "Vai fazer ou adiar? {tarefa}",
-            "Ainda estou esperando: {tarefa}",
-        ]
+        defaults = (
+            WaitingPhrasesWindow.DEFAULTS
+        )
 
         frases = cfg.get(
             "frases_waiting",
@@ -9075,13 +9034,28 @@ class MarvinCompanion:
 
     # ── Fila de lembretes ─────────────────────────────────────────────────────
 
+    def _peek_reminder(self):
+        """
+        Retorna o lembrete atualmente no topo
+        da fila sem remove-lo.
+        """
+        if not self._reminder_queue:
+            return None
+
+        return self._reminder_queue[0]
+
+
     @property
     def reminded_task(self):
-        return self._reminder_queue[0] if self._reminder_queue else None
+        return self._peek_reminder()
 
     def complete_task(self):
-        if self._reminder_queue:
-            db_concluir(self._reminder_queue[0][0])
+        atual = self._peek_reminder()
+
+        if atual is not None:
+            db_concluir(
+                atual[0]
+            )
 
         self._next_reminder()
 
@@ -9103,8 +9077,9 @@ class MarvinCompanion:
         if self._reminder_queue:
             self._reminder_queue.pop(0)
 
-        if self._reminder_queue:
-            nxt = self._reminder_queue[0]
+        nxt = self._peek_reminder()
+
+        if nxt is not None:
 
             # A proxima tarefa acabou de virar o alerta ativo.
             if cfg.get("som", True):
