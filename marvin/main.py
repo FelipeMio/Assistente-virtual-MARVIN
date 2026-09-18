@@ -46,6 +46,7 @@ from .ui.home import abrir_home
 from .ui.settings import SettingsWindow as SettingsWindowUI
 from .ui.snooze import SnoozeWindow
 from .ui.interaction_panel import InteractionPanel as InteractionPanelUI
+from .ui.waiting_phrases import WaitingPhrasesWindow as WaitingPhrasesWindowUI
 
 from marvin.database import (
     DB_F,
@@ -3570,207 +3571,24 @@ class EditTaskWindow:
 
 #  JANELA: FRASES DE ESPERA
 
-class WaitingPhrasesWindow:
-    DEFAULTS = [
-        "Ei... {tarefa}",
-        "Vai fazer ou adiar? {tarefa}",
-        "Ainda estou esperando: {tarefa}",
-    ]
-
-    def __init__(self, parent, companion):
-        self.comp = companion
-
-        self.win = _make_win(
-            parent,
-            "Frases de espera",
-            430,
-            310
-        )
-
-        self._build()
-
-        _position_near_marvin(
-            self.win,
-            self.comp
-        )
-
-
-    def _build(self):
-        w = self.win
-
-        _header(
-            w,
-            "Frases de espera"
-        )
-
-        body = tk.Frame(
-            w,
-            bg=C["win_bg"]
-        )
-
-        body.pack(
-            fill="both",
-            expand=True,
-            padx=20,
-            pady=12
-        )
-
-        tk.Label(
-            body,
-            text=(
-                "Use {tarefa} onde quiser que "
-                "apareca o nome da tarefa."
-            ),
-            bg=C["win_bg"],
-            fg=C["dim"],
-            font=("Consolas", 8),
-            wraplength=380,
-            justify="left"
-        ).pack(
-            anchor="w",
-            pady=(0, 10)
-        )
-
-        frases = cfg.get(
-            "frases_waiting",
-            self.DEFAULTS
-        )
-
-        if (
-            not isinstance(frases, list)
-            or len(frases) < 3
-        ):
-            frases = list(
-                self.DEFAULTS
-            )
-
-        self.vars = []
-
-        labels = [
-            "Primeira reacao",
-            "Segunda reacao",
-            "Terceira reacao",
-        ]
-
-        for i, label in enumerate(labels):
-
-            tk.Label(
-                body,
-                text=label,
-                bg=C["win_bg"],
-                fg=C["dim"],
-                font=(
-                    "Consolas",
-                    8,
-                    "bold"
-                )
-            ).pack(
-                anchor="w",
-                pady=(5, 2)
-            )
-
-            var = tk.StringVar(
-                value=str(frases[i])
-            )
-
-            self.vars.append(var)
-
-            entry = tk.Entry(
-                body,
-                textvariable=var,
-                bg=C["panel"],
-                fg=C["text"],
-                insertbackground=C["text"],
-                relief="flat",
-                bd=0,
-                font=("Consolas", 8)
-            )
-
-            entry.pack(
-                fill="x",
-                ipady=6
-            )
-
-        botoes = tk.Frame(
-            body,
-            bg=C["win_bg"]
-        )
-
-        botoes.pack(
-            anchor="w",
-            pady=(14, 0)
-        )
-
-        tk.Button(
-            botoes,
-            text="Salvar",
-            bg=C["green"],
-            fg=C["win_bg"],
-            bd=0,
-            padx=14,
-            pady=7,
-            font=(
-                "Consolas",
-                9,
-                "bold"
-            ),
-            cursor="hand2",
-            activebackground=C["accent"],
-            command=self._salvar
-        ).pack(
-            side="left"
-        )
-
-        tk.Button(
-            botoes,
-            text="Restaurar padrao",
-            bg=C["panel"],
-            fg=C["dim"],
-            bd=0,
-            padx=10,
-            pady=7,
-            font=("Consolas", 8),
-            cursor="hand2",
-            activebackground=C["border"],
-            command=self._restaurar
-        ).pack(
-            side="left",
-            padx=8
-        )
-
-
-    def _restaurar(self):
-        for var, texto in zip(
-            self.vars,
-            self.DEFAULTS
-        ):
-            var.set(texto)
-
-
-    def _salvar(self):
-        frases = []
-
-        for i, var in enumerate(
-            self.vars
-        ):
-            texto = var.get().strip()
-
-            if not texto:
-                texto = self.DEFAULTS[i]
-
-            frases.append(texto)
-
-        cfg["frases_waiting"] = frases
-
-        save_cfg(cfg)
-
-        self.comp.say(
-            "Frases salvas!",
-            "talking",
-            2000
-        )
-
-        self.win.destroy()
+def WaitingPhrasesWindow(
+    parent,
+    companion,
+):
+    """
+    Abre a janela de frases de espera
+    implementada em marvin.ui.waiting_phrases.
+    """
+    return WaitingPhrasesWindowUI(
+        parent,
+        companion,
+        config=cfg,
+        palette=C,
+        make_window=_make_win,
+        positioner=_position_near_marvin,
+        header_factory=_header,
+        save_config=save_cfg,
+    )
 
 
 #  JANELA: CONFIGURACOES
