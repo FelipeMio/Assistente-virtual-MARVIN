@@ -3583,10 +3583,7 @@ def WaitingPhrasesWindow(
         parent,
         companion,
         config=cfg,
-        palette=C,
-        make_window=_make_win,
         positioner=_position_near_marvin,
-        header_factory=_header,
         save_config=save_cfg,
     )
 

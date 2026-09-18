@@ -1,7 +1,15 @@
 import tkinter as tk
 
+import customtkinter as ctk
+
+from ..theme import get_modern_palette
+
 
 class WaitingPhrasesWindow:
+
+    WIDTH = 430
+    HEIGHT = 520
+
     DEFAULTS = [
         "Ei... {tarefa}",
         "Vai fazer ou adiar? {tarefa}",
@@ -14,96 +22,363 @@ class WaitingPhrasesWindow:
         companion,
         *,
         config,
-        palette,
-        make_window,
         positioner,
-        header_factory,
         save_config,
     ):
         self.comp = companion
-
         self.cfg = config
-        self.colors = palette
 
-        self._make_window = (
-            make_window
+        self._positioner = positioner
+        self._save_config = save_config
+
+        tema = self.cfg.get(
+            "tema",
+            "escuro",
         )
 
-        self._positioner = (
-            positioner
+        self.colors = (
+            get_modern_palette(
+                tema,
+                "settings",
+            )
         )
 
-        self._header_factory = (
-            header_factory
+        ctk.set_appearance_mode(
+            "Light"
+            if tema == "claro"
+            else "Dark"
         )
 
-        self._save_config = (
-            save_config
+        self.win = ctk.CTkToplevel(
+            parent
         )
 
-        self.win = self._make_window(
-            parent,
-            "Frases de espera",
-            430,
-            360
+        self.win.withdraw()
+
+        self.win.overrideredirect(
+            True
         )
+
+        self.win.geometry(
+            f"{self.WIDTH}"
+            f"x{self.HEIGHT}"
+        )
+
+        self.win.resizable(
+            False,
+            False,
+        )
+
+        self.win.attributes(
+            "-topmost",
+            True,
+        )
+
+        self.win.configure(
+            fg_color=self.colors["bg"]
+        )
+
+        self.win.transient(
+            parent
+        )
+
+        self._drag_x = 0
+        self._drag_y = 0
 
         self._build()
 
+        self.win.update_idletasks()
+
         self._positioner(
             self.win,
-            self.comp
+            self.comp,
+        )
+
+        self.win.deiconify()
+        self.win.lift()
+        self.win.focus_force()
+
+        self.win.bind(
+            "<Escape>",
+            lambda event:
+                self.win.destroy(),
+        )
+
+
+    def _drag_start(
+        self,
+        event,
+    ):
+        self._drag_x = (
+            event.x_root
+            - self.win.winfo_x()
+        )
+
+        self._drag_y = (
+            event.y_root
+            - self.win.winfo_y()
+        )
+
+
+    def _drag_move(
+        self,
+        event,
+    ):
+        x = (
+            event.x_root
+            - self._drag_x
+        )
+
+        y = (
+            event.y_root
+            - self._drag_y
+        )
+
+        self.win.geometry(
+            f"+{x}+{y}"
         )
 
 
     def _build(self):
-        w = self.win
 
-        self._header_factory(
-            w,
-            "Frases de espera"
+        shell = ctk.CTkFrame(
+            self.win,
+            fg_color=self.colors["card"],
+            corner_radius=16,
+            border_width=1,
+            border_color=self.colors[
+                "border"
+            ],
         )
 
-        body = tk.Frame(
-            w,
-            bg=self.colors["win_bg"]
+        shell.pack(
+            fill="both",
+            expand=True,
+            padx=2,
+            pady=2,
+        )
+
+
+        # ====================================================
+        # TITLEBAR
+        # ====================================================
+
+        titlebar = ctk.CTkFrame(
+            shell,
+            height=48,
+            corner_radius=0,
+            fg_color="transparent",
+        )
+
+        titlebar.pack(
+            fill="x",
+            padx=12,
+            pady=(4, 0),
+        )
+
+        titlebar.pack_propagate(
+            False
+        )
+
+
+        mark = ctk.CTkLabel(
+            titlebar,
+            text="",
+            width=6,
+        )
+
+        mark.pack(
+            side="left",
+            padx=(5, 5),
+        )
+
+
+        title = ctk.CTkLabel(
+            titlebar,
+            text=(
+                "MARVIN - "
+                "FRASES DE ESPERA"
+            ),
+            text_color=self.colors[
+                "text"
+            ],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+        )
+
+        title.pack(
+            side="left"
+        )
+
+
+        close_button = ctk.CTkButton(
+            titlebar,
+            text="x",
+            width=32,
+            height=32,
+            corner_radius=8,
+            fg_color="transparent",
+            hover_color=self.colors[
+                "surface"
+            ],
+            text_color=self.colors[
+                "dim"
+            ],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=15,
+            ),
+            command=self.win.destroy,
+        )
+
+        close_button.pack(
+            side="right"
+        )
+
+
+        for widget in (
+            titlebar,
+            mark,
+            title,
+        ):
+            widget.bind(
+                "<ButtonPress-1>",
+                self._drag_start,
+            )
+
+            widget.bind(
+                "<B1-Motion>",
+                self._drag_move,
+            )
+
+
+        ctk.CTkFrame(
+            shell,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors[
+                "border"
+            ],
+        ).pack(
+            fill="x"
+        )
+
+
+        # ====================================================
+        # CONTEUDO
+        # ====================================================
+
+        body = ctk.CTkFrame(
+            shell,
+            fg_color="transparent",
         )
 
         body.pack(
             fill="both",
             expand=True,
-            padx=20,
-            pady=12
+            padx=18,
+            pady=(14, 10),
         )
 
-        tk.Label(
+
+        ctk.CTkLabel(
+            body,
+            text="Frases de espera",
+            anchor="w",
+            text_color=self.colors[
+                "text"
+            ],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=20,
+                weight="bold",
+            ),
+        ).pack(
+            fill="x"
+        )
+
+
+        ctk.CTkLabel(
             body,
             text=(
-                "Use {tarefa} onde quiser que "
-                "apareca o nome da tarefa."
+                "Personalize as reacoes "
+                "do MARVIN enquanto um lembrete "
+                "aguarda sua resposta."
             ),
-            bg=self.colors["win_bg"],
-            fg=self.colors["dim"],
-            font=("Consolas", 8),
-            wraplength=380,
-            justify="left"
-        ).pack(
             anchor="w",
-            pady=(0, 10)
+            justify="left",
+            wraplength=380,
+            text_color=self.colors[
+                "dim"
+            ],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+            ),
+        ).pack(
+            fill="x",
+            pady=(2, 12),
         )
+
+
+        help_card = ctk.CTkFrame(
+            body,
+            fg_color=self.colors[
+                "surface"
+            ],
+            corner_radius=8,
+            border_width=1,
+            border_color=self.colors[
+                "border"
+            ],
+        )
+
+        help_card.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+
+        ctk.CTkLabel(
+            help_card,
+            text=(
+                "Use {tarefa} onde quiser "
+                "mostrar o nome da tarefa."
+            ),
+            anchor="w",
+            text_color=self.colors[
+                "dim"
+            ],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=9,
+            ),
+        ).pack(
+            fill="x",
+            padx=11,
+            pady=8,
+        )
+
 
         frases = self.cfg.get(
             "frases_waiting",
-            self.DEFAULTS
+            self.DEFAULTS,
         )
 
         if (
-            not isinstance(frases, list)
+            not isinstance(
+                frases,
+                list,
+            )
             or len(frases) < 3
         ):
             frases = list(
                 self.DEFAULTS
             )
+
 
         self.vars = []
 
@@ -113,122 +388,227 @@ class WaitingPhrasesWindow:
             "Terceira reacao",
         ]
 
-        for i, label in enumerate(labels):
 
-            tk.Label(
+        for index, label in enumerate(
+            labels
+        ):
+
+            ctk.CTkLabel(
                 body,
                 text=label,
-                bg=self.colors["win_bg"],
-                fg=self.colors["dim"],
-                font=(
-                    "Consolas",
-                    8,
-                    "bold"
-                )
-            ).pack(
                 anchor="w",
-                pady=(5, 2)
+                text_color=self.colors[
+                    "dim"
+                ],
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=9,
+                    weight="bold",
+                ),
+            ).pack(
+                fill="x",
+                pady=(
+                    (0, 4)
+                    if index == 0
+                    else (8, 4)
+                ),
             )
+
 
             var = tk.StringVar(
-                value=str(frases[i])
+                value=str(
+                    frases[index]
+                )
             )
 
-            self.vars.append(var)
+            self.vars.append(
+                var
+            )
 
-            entry = tk.Entry(
+
+            entry = ctk.CTkEntry(
                 body,
                 textvariable=var,
-                bg=self.colors["panel"],
-                fg=self.colors["text"],
-                insertbackground=self.colors["text"],
-                relief="flat",
-                bd=0,
-                font=("Consolas", 8)
+                height=36,
+                corner_radius=8,
+                border_width=1,
+                border_color=self.colors[
+                    "border"
+                ],
+                fg_color=self.colors[
+                    "surface"
+                ],
+                text_color=self.colors[
+                    "text"
+                ],
+                font=ctk.CTkFont(
+                    family="Segoe UI",
+                    size=10,
+                ),
             )
 
             entry.pack(
-                fill="x",
-                ipady=6
+                fill="x"
             )
 
-        botoes = tk.Frame(
-            body,
-            bg=self.colors["win_bg"]
+
+        # ====================================================
+        # FOOTER
+        # ====================================================
+
+        footer = ctk.CTkFrame(
+            shell,
+            fg_color=self.colors[
+                "card"
+            ],
+            corner_radius=0,
         )
 
-        botoes.pack(
-            anchor="w",
-            pady=(14, 0)
+        footer.pack(
+            fill="x"
         )
 
-        tk.Button(
-            botoes,
-            text="Salvar",
-            bg=self.colors["green"],
-            fg=self.colors["win_bg"],
-            bd=0,
-            padx=14,
-            pady=7,
-            font=(
-                "Consolas",
-                9,
-                "bold"
-            ),
-            cursor="hand2",
-            activebackground=self.colors["accent"],
-            command=self._salvar
+
+        ctk.CTkFrame(
+            footer,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors[
+                "border"
+            ],
         ).pack(
-            side="left"
+            fill="x"
         )
 
-        tk.Button(
-            botoes,
+
+        actions = ctk.CTkFrame(
+            footer,
+            fg_color="transparent",
+        )
+
+        actions.pack(
+            fill="x",
+            padx=18,
+            pady=12,
+        )
+
+        actions.grid_columnconfigure(
+            0,
+            weight=1,
+        )
+
+        actions.grid_columnconfigure(
+            1,
+            weight=1,
+        )
+
+
+        ctk.CTkButton(
+            actions,
             text="Restaurar padrao",
-            bg=self.colors["panel"],
-            fg=self.colors["dim"],
-            bd=0,
-            padx=10,
-            pady=7,
-            font=("Consolas", 8),
-            cursor="hand2",
-            activebackground=self.colors["border"],
-            command=self._restaurar
-        ).pack(
-            side="left",
-            padx=8
+            height=40,
+            corner_radius=8,
+            fg_color="transparent",
+            hover_color=self.colors[
+                "surface"
+            ],
+            border_width=1,
+            border_color=self.colors[
+                "border"
+            ],
+            text_color=self.colors[
+                "dim"
+            ],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+            command=self._restaurar,
+        ).grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=(0, 5),
+        )
+
+
+        ctk.CTkButton(
+            actions,
+            text="Salvar alteracoes",
+            height=40,
+            corner_radius=8,
+            fg_color=self.colors[
+                "accent"
+            ],
+            hover_color=self.colors[
+                "accent_hover"
+            ],
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="bold",
+            ),
+            command=self._salvar,
+        ).grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(5, 0),
         )
 
 
     def _restaurar(self):
+
         for var, texto in zip(
             self.vars,
-            self.DEFAULTS
+            self.DEFAULTS,
         ):
-            var.set(texto)
+            var.set(
+                texto
+            )
 
 
     def _salvar(self):
+
         frases = []
 
-        for i, var in enumerate(
+        for index, var in enumerate(
             self.vars
         ):
-            texto = var.get().strip()
+            texto = (
+                var.get()
+                .strip()
+            )
 
             if not texto:
-                texto = self.DEFAULTS[i]
+                texto = (
+                    self.DEFAULTS[
+                        index
+                    ]
+                )
 
-            frases.append(texto)
+            frases.append(
+                texto
+            )
 
-        self.cfg["frases_waiting"] = frases
 
-        self._save_config(self.cfg)
+        self.cfg[
+            "frases_waiting"
+        ] = frases
+
+
+        self._save_config(
+            self.cfg
+        )
+
 
         self.comp.say(
             "Frases salvas!",
             "talking",
-            2000
+            2000,
         )
+
 
         self.win.destroy()
