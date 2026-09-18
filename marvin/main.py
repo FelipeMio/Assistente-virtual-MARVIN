@@ -47,6 +47,7 @@ from .ui.settings import SettingsWindow as SettingsWindowUI
 from .ui.snooze import SnoozeWindow
 from .ui.interaction_panel import InteractionPanel as InteractionPanelUI
 from .ui.waiting_phrases import WaitingPhrasesWindow as WaitingPhrasesWindowUI
+from .ui.edit_task import EditTaskWindow as EditTaskWindowUI
 
 from marvin.database import (
     DB_F,
@@ -3323,251 +3324,32 @@ class TaskWindow:
 
 
 
-class EditTaskWindow:
-    def __init__(self, parent, companion, tid, callback):
-        self.comp     = companion
-        self.tid      = tid
-        self.callback = callback
-        row = db_obter(tid)
+def EditTaskWindow(
+    parent,
+    companion,
+    tid,
+    callback,
+):
+    """
+    Abre a janela de edicao de tarefa
+    implementada em marvin.ui.edit_task.
+    """
+    return EditTaskWindowUI(
+        parent,
+        companion,
+        tid,
+        callback,
+        config=cfg,
+        positioner=_position_near_marvin,
+        repeat_options=REPEAT_OPTS,
+        priority_options=PRIORITY_OPTS,
+        bind_auto_time=_bind_auto_time,
+        validate_time=_validate_time,
+        validate_date=_validate_date,
+        db_get=db_obter,
+        db_update=db_alterar,
+    )
 
-        if not row:
-            messagebox.showwarning(
-                "MARVIN",
-                (
-                    "Esta tarefa nao foi encontrada.\n\n"
-                    "Ela pode ter sido excluida ou alterada "
-                    "por outra janela."
-                ),
-                parent=parent
-            )
-            return
-
-        texto, desc, data, hora, rep, prioridade = row
-        self.win = _make_win(parent, "Editar Tarefa", 400, 415)
-        self.win.grab_set()
-        self._build(
-            texto,
-            desc,
-            data,
-            hora,
-            rep,
-            prioridade
-        )
-        _position_near_marvin(self.win, self.comp)
-
-    def _build(
-        self,
-        texto,
-        desc,
-        data,
-        hora,
-        rep,
-        prioridade
-    ):
-        w = self.win
-        _header(w, "Editar Tarefa")
-        body = tk.Frame(w, bg=C["win_bg"])
-        body.pack(fill="both", expand=True, padx=20, pady=8)
-
-        _lbl(body, "Titulo")
-        self.v_txt = tk.StringVar(value=texto)
-        _entry(body, self.v_txt)
-
-        _lbl(body, "Descricao")
-        self.v_desc = tk.StringVar(value=desc)
-        _entry(body, self.v_desc)
-
-        row_f = tk.Frame(body, bg=C["win_bg"])
-        row_f.pack(fill="x", pady=(4, 0))
-        Lf = tk.Frame(row_f, bg=C["win_bg"])
-        Lf.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        Rf = tk.Frame(row_f, bg=C["win_bg"])
-        Rf.pack(side="left")
-
-        tk.Label(Lf, text="Data (AAAA-MM-DD)",
-                  bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
-        self.v_data = tk.StringVar(value=data)
-        _entry(Lf, self.v_data)
-
-        tk.Label(Rf, text="Hora (HH:MM)",
-                  bg=C["win_bg"], fg=C["dim"],
-                  font=("Consolas", 8, "bold")).pack(anchor="w", pady=(8, 2))
-        self.v_hora = tk.StringVar(value=hora[:5])
-        self.e_hora = _entry(
-            Rf,
-            self.v_hora,
-            width=7
-        )
-
-        # Digitar 1830 vira automaticamente 18:30.
-        _bind_auto_time(
-            self.e_hora,
-            self.v_hora
-        )
-
-        _lbl(body, "Repeticao")
-        self.v_rep = tk.StringVar(value=rep)
-        _option_menu(body, self.v_rep)
-
-        _lbl(body, "Prioridade")
-        self.v_prioridade = tk.StringVar(
-            value=(
-                prioridade
-                if prioridade in PRIORITY_OPTS
-                else "Normal"
-            )
-        )
-
-        _priority_menu(
-            body,
-            self.v_prioridade
-        )
-
-        self.v_err = tk.StringVar()
-        tk.Label(body, textvariable=self.v_err, bg=C["win_bg"], fg=C["red"],
-                  font=("Consolas", 8)).pack(anchor="w", pady=(4, 0))
-
-        bf = tk.Frame(body, bg=C["win_bg"])
-        bf.pack(anchor="w", pady=8)
-        tk.Button(bf, text="  Salvar  ",
-                   bg=C["accent"], fg=C["win_bg"], bd=0,
-                   padx=14, pady=7,
-                   font=("Consolas", 9, "bold"), cursor="hand2",
-                   activebackground=C["purple"],
-                   activeforeground=C["win_bg"],
-                   command=self._salvar).pack(side="left")
-        tk.Button(bf, text="  Cancelar  ",
-                   bg=C["panel"], fg=C["dim"], bd=0,
-                   padx=10, pady=7, font=("Consolas", 9),
-                   cursor="hand2",
-                   activebackground=C["border"],
-                   activeforeground=C["text"],
-                   command=w.destroy).pack(side="left", padx=8)
-
-        w.bind("<Return>", lambda e: self._salvar())
-        w.bind("<Escape>", lambda e: w.destroy())
-
-    def _salvar(self):
-        txt = self.v_txt.get().strip()
-
-        if not txt:
-            self.v_err.set(
-                "Titulo nao pode ser vazio."
-            )
-            return
-
-        data_txt = (
-            self.v_data
-            .get()
-            .strip()
-        )
-
-        hora = _validate_time(
-            self.v_hora.get()
-        )
-
-        # A janela legada de edicao historicamente
-        # exibe AAAA-MM-DD, enquanto a Nova Tarefa
-        # aceita DD/MM/AAAA. Mantemos compatibilidade
-        # com os dois formatos.
-        data = _validate_date(
-            data_txt
-        )
-
-        if data is None:
-            try:
-                data = (
-                    datetime.datetime.strptime(
-                        data_txt,
-                        "%Y-%m-%d"
-                    )
-                    .strftime(
-                        "%Y-%m-%d"
-                    )
-                )
-
-            except ValueError:
-                self.v_err.set(
-                    "Data invalida. Use DD/MM/AAAA ou AAAA-MM-DD."
-                )
-                return
-
-        if hora is None:
-            self.v_err.set(
-                "Horario invalido. Use HH:MM."
-            )
-            return
-
-        try:
-            task_dt = datetime.datetime.strptime(
-                f"{data} {hora}",
-                "%Y-%m-%d %H:%M"
-            )
-
-        except ValueError:
-            self.v_err.set(
-                "Data ou horario invalido."
-            )
-            return
-
-        if task_dt <= datetime.datetime.now():
-            self.v_err.set(
-                "Escolha um horario a partir do proximo minuto."
-            )
-            return
-
-        db_alterar(
-            self.tid,
-            "texto",
-            txt
-        )
-
-        db_alterar(
-            self.tid,
-            "descricao",
-            self.v_desc.get().strip()
-        )
-
-        db_alterar(
-            self.tid,
-            "data",
-            data
-        )
-
-        db_alterar(
-            self.tid,
-            "hora",
-            hora
-        )
-
-        db_alterar(
-            self.tid,
-            "recorrencia",
-            self.v_rep.get()
-        )
-
-        db_alterar(
-            self.tid,
-            "prioridade",
-            self.v_prioridade.get()
-        )
-
-        db_alterar(
-            self.tid,
-            "lembrado",
-            0
-        )
-
-        self.callback()
-
-        self.comp.say(
-            "Tarefa editada!",
-            "talking",
-            2000
-        )
-
-        self.win.destroy()
 
 #  JANELA: FRASES DE ESPERA
 
