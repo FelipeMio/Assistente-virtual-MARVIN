@@ -1,4 +1,4 @@
-﻿import json
+import json
 import queue
 import sys
 import time
@@ -17,6 +17,12 @@ CONFIG_FILE = (
     / "b2b_telegram"
     / "config.json"
 )
+
+
+# Um aviso B2B deixa de ocupar a interface
+# depois de 24 horas sem confirmacao.
+# A notificacao permanece no historico.
+ALERT_TTL_SECONDS = 24 * 60 * 60
 
 
 def _carregar_config():
@@ -104,6 +110,7 @@ def iniciar_extensao(comp):
         "janela": None,
         "aviso_ativo": False,
         "notification_id": None,
+        "expires_at": None,
     }
 
     def preparar_mensagem(texto):
@@ -232,6 +239,7 @@ def iniciar_extensao(comp):
         estado["janela"] = None
         estado["aviso_ativo"] = False
         estado["notification_id"] = None
+        estado["expires_at"] = None
 
         limpar_balao()
 
@@ -242,12 +250,55 @@ def iniciar_extensao(comp):
             processar_fila,
         )
 
+
+    def expirar_aviso():
+        """
+        Remove apenas o aviso ativo da interface.
+
+        A notificacao NAO e marcada como lida
+        nem removida do historico.
+        """
+        janela = estado.get(
+            "janela"
+        )
+
+        if janela is not None:
+            try:
+                janela.win.destroy()
+            except Exception:
+                pass
+
+        estado["janela"] = None
+        estado["aviso_ativo"] = False
+        estado["notification_id"] = None
+        estado["expires_at"] = None
+
+        limpar_balao()
+
+        print(
+            "[B2B Telegram] "
+            "Aviso expirou apos 24 horas. "
+            "Historico preservado."
+        )
+
+
     def mostrar_aviso(
         mensagem,
         notification_id=None,
+        expira_em=None,
     ):
+        if expira_em is None:
+            expira_em = (
+                time.time()
+                + ALERT_TTL_SECONDS
+            )
+
         estado["notification_id"] = (
             notification_id
+        )
+
+        estado["expires_at"] = (
+            expira_em
         )
 
         try:
@@ -309,18 +360,53 @@ def iniciar_extensao(comp):
         except queue.Empty:
             pass
 
-        if (
-            not estado["aviso_ativo"]
-            and pendentes
-        ):
-            mensagem, notification_id = (
-                pendentes.popleft()
+
+        # Verifica se o aviso atualmente
+        # exibido completou 24 horas.
+        if estado["aviso_ativo"]:
+            expira_em = estado.get(
+                "expires_at"
             )
 
-            mostrar_aviso(
-                mensagem,
-                notification_id,
-            )
+            if (
+                expira_em is not None
+                and time.time() >= expira_em
+            ):
+                expirar_aviso()
+
+
+        # Procura a proxima mensagem ainda
+        # dentro da janela de 24 horas.
+        if not estado["aviso_ativo"]:
+
+            while pendentes:
+                (
+                    mensagem,
+                    notification_id,
+                    expira_em,
+                ) = pendentes.popleft()
+
+
+                # A mensagem continua no historico,
+                # mas nao deve mais abrir popup.
+                if time.time() >= expira_em:
+                    print(
+                        "[B2B Telegram] "
+                        "Aviso pendente expirado. "
+                        "Historico preservado."
+                    )
+
+                    continue
+
+
+                mostrar_aviso(
+                    mensagem,
+                    notification_id,
+                    expira_em,
+                )
+
+                break
+
 
         try:
             comp.root.after(
@@ -331,12 +417,21 @@ def iniciar_extensao(comp):
         except Exception:
             pass
 
+
     def recebeu_mensagem(texto):
         # Esta funcao roda na thread
         # do Telegram.
 
         mensagem = preparar_mensagem(
             texto
+        )
+
+        # A validade visual conta a partir
+        # do momento em que a mensagem
+        # chega ao MARVIN.
+        expira_em = (
+            time.time()
+            + ALERT_TTL_SECONDS
         )
 
         notification_id = None
@@ -364,6 +459,7 @@ def iniciar_extensao(comp):
             (
                 mensagem,
                 notification_id,
+                expira_em,
             )
         )
 
