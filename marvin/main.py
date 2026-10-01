@@ -38,7 +38,7 @@ from .tray import TrayController
 from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
 from .sprite_renderer import SpriteRenderer
-from .reminders import ReminderService
+from .reminders import ReminderQueue, ReminderService
 from .checklist import abrir_checklist
 from .ui.home import abrir_home
 from .ui.settings import SettingsWindow as SettingsWindowUI
@@ -1158,7 +1158,6 @@ class MarvinCompanion:
         )
 
         self._bubble_deadline = None
-        self._reminder_queue = []
         self._panel_open     = False
         self._dragging       = False
 
@@ -1858,15 +1857,21 @@ class MarvinCompanion:
 
     # ── Fila de lembretes ─────────────────────────────────────────────────────
 
+    @property
+    def _reminder_queue(self):
+        """
+        Ponte temporaria para componentes que ainda
+        acessam a fila diretamente.
+        """
+        return self._reminders.queue
+
+
     def _peek_reminder(self):
         """
         Retorna o lembrete atualmente no topo
         da fila sem remove-lo.
         """
-        if not self._reminder_queue:
-            return None
-
-        return self._reminder_queue[0]
+        return self._reminders.queue.peek()
 
 
     @property
@@ -1898,10 +1903,11 @@ class MarvinCompanion:
         self.say(msg, "happy", 2000)
 
     def _next_reminder(self):
-        if self._reminder_queue:
-            self._reminder_queue.pop(0)
+        self._reminders.queue.pop_current()
 
-        nxt = self._peek_reminder()
+        nxt = (
+            self._reminders.queue.peek()
+        )
 
         if nxt is not None:
 
@@ -2393,8 +2399,11 @@ class MarvinCompanion:
         tid = row[0]
         rep = row[5]
 
-        # Evita colocar a mesma tarefa duas vezes na fila
-        if any(r[0] == tid for r in self._reminder_queue):
+        # Evita colocar a mesma tarefa duas vezes na fila.
+        if (
+            self._reminders.queue
+            .contains_task_id(tid)
+        ):
             return
 
         db_marcar_lembrado(tid)
@@ -2417,9 +2426,11 @@ class MarvinCompanion:
 
         # Se ja existe um alerta na tela,
         # apenas adiciona esta tarefa na fila.
-        was_empty = not self._reminder_queue
+        was_empty = not self._reminders.queue
 
-        self._reminder_queue.append(row)
+        self._reminders.queue.append(
+            row
+        )
 
         if not was_empty:
             return

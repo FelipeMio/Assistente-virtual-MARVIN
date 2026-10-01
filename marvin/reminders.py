@@ -3,6 +3,93 @@ import threading
 import tkinter as tk
 
 
+class ReminderQueue:
+    """
+    Fila dos lembretes atualmente ativos.
+
+    Implementa as operacoes basicas de uma lista
+    para manter compatibilidade temporaria com
+    componentes antigos do MARVIN.
+    """
+
+    def __init__(self):
+        self._items = []
+
+
+    def __bool__(self):
+        return bool(
+            self._items
+        )
+
+
+    def __len__(self):
+        return len(
+            self._items
+        )
+
+
+    def __iter__(self):
+        return iter(
+            self._items
+        )
+
+
+    def __getitem__(
+        self,
+        index,
+    ):
+        return self._items[
+            index
+        ]
+
+
+    def append(
+        self,
+        row,
+    ):
+        self._items.append(
+            row
+        )
+
+
+    def pop(
+        self,
+        index=-1,
+    ):
+        return self._items.pop(
+            index
+        )
+
+
+    def clear(self):
+        self._items.clear()
+
+
+    def peek(self):
+        if not self._items:
+            return None
+
+        return self._items[0]
+
+
+    def pop_current(self):
+        if not self._items:
+            return None
+
+        return self._items.pop(0)
+
+
+    def contains_task_id(
+        self,
+        task_id,
+    ):
+        return any(
+            row[0] == task_id
+            for row in self._items
+        )
+
+
+
 class ReminderService:
     """
     Monitora tarefas pendentes em background
@@ -21,6 +108,9 @@ class ReminderService:
         self.root = root
         self._list_tasks = list_tasks
         self._on_due = on_due
+
+        # Fila dos lembretes entregues para a UI.
+        self.queue = ReminderQueue()
 
         self.poll_seconds = float(
             poll_seconds
