@@ -38,6 +38,7 @@ from .tray import TrayController
 from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
 from .sprite_renderer import SpriteRenderer
+from .reminders import ReminderService
 from .checklist import abrir_checklist
 from .ui.home import abrir_home
 from .ui.settings import SettingsWindow as SettingsWindowUI
@@ -1146,9 +1147,16 @@ class MarvinCompanion:
         self.bubble          = ""
         self.b_timer         = 0
 
-        # Controle de encerramento da thread de lembretes.
-        self._reminder_stop = threading.Event()
-        self._reminder_thread = None
+        # Monitoramento de lembretes.
+        self._reminders = ReminderService(
+            self.root,
+            list_tasks=db_listar,
+            on_due=self._enqueue,
+            poll_seconds=(
+                self.REMINDER_POLL_SECONDS
+            ),
+        )
+
         self._bubble_deadline = None
         self._reminder_queue = []
         self._panel_open     = False
@@ -1206,7 +1214,7 @@ class MarvinCompanion:
         self._tray.start()
 
         self._animate()
-        self._start_reminders()
+        self._reminders.start()
 
         # Sistema central de notificacoes do MARVIN.
         self.notifications = NotificationManager()
@@ -2381,139 +2389,6 @@ class MarvinCompanion:
 
     # ── Lembretes ─────────────────────────────────────────────────────────────
 
-    def _start_reminders(self):
-        # Evita criar duas threads de lembretes
-        # para a mesma instancia do MARVIN.
-        if (
-            self._reminder_thread is not None
-            and self._reminder_thread.is_alive()
-        ):
-            return
-
-        self._reminder_stop.clear()
-
-        def loop():
-            # Event.wait substitui time.sleep.
-            # Alem de esperar 1 segundo, ele acorda
-            # imediatamente quando o MARVIN e encerrado.
-            while not self._reminder_stop.wait(self.REMINDER_POLL_SECONDS):
-
-                now = datetime.datetime.now()
-                today = now.strftime("%Y-%m-%d")
-
-                try:
-                    rows = db_listar(
-                        apenas_pendentes=True
-                    )
-                except Exception as exc:
-                    print(
-                        f"[MARVIN] Erro ao listar lembretes: {exc}"
-                    )
-                    continue
-
-                for row in rows:
-
-                    if self._reminder_stop.is_set():
-                        break
-
-                    (
-                        tid,
-                        texto,
-                        desc,
-                        data,
-                        hora,
-                        rep,
-                        conc,
-                        lemb
-                    ) = row
-
-                    if lemb:
-                        continue
-
-                    hora_s = hora[:5]
-
-                    try:
-                        data_original = (
-                            datetime.date.fromisoformat(data)
-                        )
-                    except (TypeError, ValueError):
-                        continue
-
-                    hoje_data = now.date()
-
-                    if hoje_data < data_original:
-                        continue
-
-                    if rep == "Nunca":
-                        data_lembrete = data_original
-
-                    else:
-                        if not self._should_remind(
-                            rep,
-                            data,
-                            now,
-                            today
-                        ):
-                            continue
-
-                        data_lembrete = hoje_data
-
-                    try:
-                        hora_obj = datetime.datetime.strptime(
-                            hora_s,
-                            "%H:%M"
-                        ).time()
-                    except (TypeError, ValueError):
-                        continue
-
-                    task_dt = datetime.datetime.combine(
-                        data_lembrete,
-                        hora_obj
-                    )
-
-                    diff = (
-                        now - task_dt
-                    ).total_seconds()
-
-                    if (
-                        0 <= diff < 90
-                        and not self._reminder_stop.is_set()
-                    ):
-                        try:
-                            self.root.after(
-                                0,
-                                lambda r=row: self._enqueue(r)
-                            )
-                        except tk.TclError:
-                            return
-
-        self._reminder_thread = threading.Thread(
-            target=loop,
-            name="marvin-reminders",
-            daemon=True
-        )
-
-        self._reminder_thread.start()
-
-    def _should_remind(self, rep, data, now, today):
-        if rep == "Nunca":
-            return data == today
-        if rep == "Todo dia":
-            return True
-        if rep == "Toda semana":
-            try:
-                return (datetime.date.fromisoformat(data).weekday()
-                        == now.weekday())
-            except Exception:
-                return False
-        if rep == "Seg/Qua/Sex":
-            return now.weekday() in (0, 2, 4)
-        if rep == "Seg a Sex":
-            return now.weekday() < 5
-        if rep == "Fins de semana":
-            return now.weekday() >= 5
-        return False
-
     def _enqueue(self, row):
         tid = row[0]
         rep = row[5]
@@ -2573,10 +2448,9 @@ class MarvinCompanion:
     def _on_close(self):
         """Encerra completamente o MARVIN."""
 
-        # Avisa imediatamente a thread de lembretes
-        # que o aplicativo esta sendo encerrado.
+        # Encerra o monitor de lembretes.
         try:
-            self._reminder_stop.set()
+            self._reminders.stop()
         except Exception:
             pass
 
