@@ -1,6 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
-import threading, math, time, datetime, random, sys, textwrap, os
+import threading, math, time, datetime, sys, textwrap, os
 from tkinter import messagebox
 from pathlib import Path
 
@@ -39,6 +39,7 @@ from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
 from .sprite_renderer import SpriteRenderer
 from .reminders import ReminderQueue, ReminderService
+from .routine import RoutineController
 from .checklist import abrir_checklist
 from .ui.home import abrir_home
 from .ui.settings import SettingsWindow as SettingsWindowUI
@@ -1184,9 +1185,56 @@ class MarvinCompanion:
         
         
 
-        # Frases idle
-        self._idle_job = None
-        self._schedule_idle()
+        # Rotina diaria e frases idle.
+        self._routine = RoutineController(
+            self.root,
+            config=cfg,
+            save_config=save_cfg,
+            list_tasks=db_listar,
+            streak_today=db_streak_hoje,
+            idle_phrases=(
+                _frases_idle_ativas
+            ),
+            greeting_factory=(
+                _frase_saudacao
+            ),
+            say=self.say,
+            show_marvin=self._show_marvin,
+            reminder_active=lambda:
+                bool(
+                    self._reminder_queue
+                ),
+            compact_active=lambda:
+                self._compact_mode,
+            expand_compact=(
+                self._expand_compact_for_reminder
+            ),
+            can_idle_speak=lambda:
+                (
+                    self.state == "idle"
+                    and not self.bubble
+                ),
+            set_state=lambda value:
+                setattr(
+                    self,
+                    "state",
+                    value,
+                ),
+            set_bubble_mode=lambda value:
+                setattr(
+                    self,
+                    "_bubble_mode",
+                    value,
+                ),
+            set_bubble_hover=lambda value:
+                setattr(
+                    self,
+                    "_bubble_hover",
+                    value,
+                ),
+        )
+
+        self._routine.schedule_idle()
 
         # Eventos
         self.cv.bind("<ButtonPress-1>",   self._drag_start)
@@ -1222,7 +1270,7 @@ class MarvinCompanion:
         self._extensions = carregar_extensoes(self)
 
         threading.Thread(target=db_limpar_antigas, daemon=True).start()
-        self.root.after(900, self._inicio_do_dia)
+        self.root.after(900, self._routine.start_day)
 
     # ── Bandeja do Windows ─────────────────────────────────────────────────
 
@@ -1274,7 +1322,7 @@ class MarvinCompanion:
                 NewTaskWindow(self.root, self),
             abrir_checklist=lambda:
                 abrir_checklist(self.root),
-            abrir_resumo=self._resumo_do_dia,
+            abrir_resumo=self._routine.summary,
             abrir_config=lambda:
                 SettingsWindow(self.root, self),
         )
@@ -1308,7 +1356,7 @@ class MarvinCompanion:
 
     def _tray_summary(self):
         self._show_marvin()
-        self._resumo_do_dia()
+        self._routine.summary()
 
 
     def _tray_settings(self):
@@ -1512,326 +1560,13 @@ class MarvinCompanion:
 
     # ── Resumo do dia ───────────────────────────────────────────────────────
 
-    def _task_due_today(self, row, hoje):
-        """
-        Diz se uma tarefa pendente pertence ao dia atual,
-        considerando a recorrencia.
-        """
-
-        try:
-            (
-                tid,
-                texto,
-                desc,
-                data,
-                hora,
-                rep,
-                concluida,
-                lembrado
-            ) = row
-
-        except Exception:
-            return False
-
-        if concluida:
-            return False
-
-        try:
-            data_base = datetime.date.fromisoformat(
-                data
-            )
-        except Exception:
-            return False
-
-        # A recorrencia ainda nao comecou.
-        if data_base > hoje:
-            return False
-
-        if rep == "Nunca":
-            return data_base == hoje
-
-        if rep == "Todo dia":
-            return True
-
-        if rep == "Toda semana":
-            return (
-                data_base.weekday()
-                == hoje.weekday()
-            )
-
-        if rep == "Seg/Qua/Sex":
-            return hoje.weekday() in (
-                0,
-                2,
-                4
-            )
-
-        if rep == "Seg a Sex":
-            return hoje.weekday() < 5
-
-        if rep == "Fins de semana":
-            return hoje.weekday() >= 5
-
-        return False
-
-
-    def _inicio_do_dia(self):
-        """
-        Na primeira abertura do MARVIN no dia,
-        mostra o resumo. Nas proximas aberturas,
-        usa apenas a saudacao normal.
-        """
-
-        hoje = (
-            datetime.date.today()
-            .isoformat()
-        )
-
-        if (
-            cfg.get("ultimo_resumo_dia")
-            != hoje
-        ):
-            self._resumo_do_dia()
-
-        else:
-            self._saudacao_inicial()
-
-
-    def _resumo_do_dia(self):
-        # Nunca substitui um lembrete ativo.
-        if self._reminder_queue:
-            return
-
-        # Se estiver escondido, reaparece.
-        self._show_marvin()
-
-        # Se estiver compacto, expande
-        # temporariamente para mostrar o balao.
-        if self._compact_mode:
-            self._expand_compact_for_reminder()
-
-        hoje = datetime.date.today()
-        hoje_iso = hoje.isoformat()
-
-        try:
-            rows = db_listar()
-        except Exception as exc:
-            print(
-                f"[MARVIN] Erro ao gerar resumo: {exc}"
-            )
-            return
-
-        pendentes_hoje = 0
-        atrasadas = 0
-
-        for row in rows:
-            try:
-                (
-                    tid,
-                    texto,
-                    desc,
-                    data,
-                    hora,
-                    rep,
-                    concluida,
-                    lembrado
-                ) = row
-
-            except Exception:
-                continue
-
-            if concluida:
-                continue
-
-            if self._task_due_today(
-                row,
-                hoje
-            ):
-                pendentes_hoje += 1
-                continue
-
-            # Apenas tarefas sem recorrencia
-            # sao consideradas atrasadas.
-            if rep == "Nunca":
-                try:
-                    data_tarefa = (
-                        datetime.date.fromisoformat(
-                            data
-                        )
-                    )
-
-                    if data_tarefa < hoje:
-                        atrasadas += 1
-
-                except Exception:
-                    pass
-
-        concluidas_hoje = (
-            db_streak_hoje()
-        )
-
-        hora = (
-            datetime.datetime.now().hour
-        )
-
-        if hora < 12:
-            saudacao = "Bom dia!"
-
-        elif hora < 18:
-            saudacao = "Boa tarde!"
-
-        else:
-            saudacao = "Boa noite!"
-
-        partes = []
-
-        if pendentes_hoje == 0:
-            partes.append(
-                "Nenhuma tarefa pendente para hoje."
-            )
-
-        elif pendentes_hoje == 1:
-            partes.append(
-                "Voce tem 1 tarefa para hoje."
-            )
-
-        else:
-            partes.append(
-                f"Voce tem {pendentes_hoje} tarefas para hoje."
-            )
-
-        if atrasadas == 1:
-            partes.append(
-                "1 esta atrasada."
-            )
-
-        elif atrasadas > 1:
-            partes.append(
-                f"{atrasadas} estao atrasadas."
-            )
-
-        if concluidas_hoje == 1:
-            partes.append(
-                "1 concluida hoje."
-            )
-
-        elif concluidas_hoje > 1:
-            partes.append(
-                f"{concluidas_hoje} concluidas hoje."
-            )
-
-        mensagem = (
-            saudacao
-            + " "
-            + " ".join(partes)
-        )
-
-        cfg["ultimo_resumo_dia"] = (
-            hoje_iso
-        )
-
-        save_cfg(cfg)
-
-        self._bubble_mode = "normal"
-        self._bubble_hover = None
-
-        self.say(
-            mensagem,
-            "talking",
-            8000
-        )
-
-
-    # ── Saudacao ──────────────────────────────────────────────────────────────
-
-    def _saudacao_inicial(self):
-        self.state = "idle"
-        rows = db_listar()
-        n    = len([r for r in rows if not r[6]])
-        self.say(_frase_saudacao(n), "talking", 5000)
-
-    # ── Idle aleatorio ────────────────────────────────────────────────────────
-
-    def _idle_interval_ms(self):
-        """
-        Retorna o intervalo configurado das
-        falas espontaneas em milissegundos.
-
-        Zero significa desativado.
-        """
-        try:
-            seconds = int(
-                cfg.get(
-                    "idle_interval_seconds",
-                    300,
-                )
-            )
-        except (TypeError, ValueError):
-            seconds = 300
-
-        return max(
-            0,
-            seconds,
-        ) * 1000
-
-
     def _schedule_idle(self):
         """
-        Mantem somente um timer idle ativo.
+        Ponte temporaria usada pela janela
+        de configuracoes.
         """
+        self._routine.schedule_idle()
 
-        old_job = getattr(
-            self,
-            "_idle_job",
-            None,
-        )
-
-        if old_job is not None:
-            try:
-                self.root.after_cancel(
-                    old_job
-                )
-            except Exception:
-                pass
-
-            self._idle_job = None
-
-        interval = (
-            self._idle_interval_ms()
-        )
-
-        if interval <= 0:
-            return
-
-        self._idle_job = (
-            self.root.after(
-                interval,
-                self._idle_msg,
-            )
-        )
-
-    def _idle_msg(self):
-        self._idle_job = None
-
-        if self._idle_interval_ms() <= 0:
-            return
-
-        if (
-            self.state == "idle"
-            and not self.bubble
-        ):
-            self._bubble_mode = "normal"
-            self._bubble_hover = None
-
-            self.say(
-                random.choice(
-                    _frases_idle_ativas()
-                ),
-                "talking",
-                10000,
-            )
-
-        self._schedule_idle()
 
     def say(self, text, state="talking", duration=4000):
         self.bubble = text
