@@ -3,7 +3,6 @@ import customtkinter as ctk
 import threading, math, time, datetime, random, sys, textwrap, os
 from tkinter import messagebox
 from pathlib import Path
-from PIL import Image, ImageTk
 
 # ============================================================
 # WIN32
@@ -37,6 +36,7 @@ from .extension_loader import carregar_extensoes
 from .notifications import NotificationManager
 from .tray import TrayController
 from .compact_mode import CompactModeController
+from .sprites import SpriteLoader
 from .checklist import abrir_checklist
 from .ui.home import abrir_home
 from .ui.settings import SettingsWindow as SettingsWindowUI
@@ -1074,12 +1074,11 @@ class MarvinCompanion:
         self.cv.pack()
 
         # Sprites do MARVIN
-        self._idle_frames = self._load_idle_frames()
-        self._alert_frames = self._load_alert_frames()
-        self._waiting_frames = self._load_waiting_frames()
-        self._happy_frame = self._load_happy_frame()
-        self._compact_frames = self._load_compact_frames()
-        self._yawn_frames = self._load_yawn_frames()
+        self._sprite_loader = SpriteLoader(
+            config=cfg,
+        )
+
+        self._reload_sprites()
 
         # Controle da piscada
         self._next_blink = time.monotonic() + random.uniform(self.BLINK_MIN_SECONDS, self.BLINK_MAX_SECONDS)
@@ -1360,289 +1359,42 @@ class MarvinCompanion:
             self._dragging = True
 
 
-    def _normal_sprite_size(self):
-        percentual = int(
-            cfg.get("tamanho_normal", 100)
-        )
-
-        percentual = max(
-            60,
-            min(120, percentual)
-        )
-
-        return max(
-            1,
-            int(150 * percentual / 100)
-        )
-
-
-    def _compact_sprite_scale(self):
-        percentual = int(
-            cfg.get("tamanho_compacto", 85)
-        )
-
-        percentual = max(
-            60,
-            min(120, percentual)
-        )
-
-        return percentual / 100.0
-
-
     def _reload_sprites(self):
-        self._idle_frames = self._load_idle_frames()
-        self._alert_frames = self._load_alert_frames()
-        self._waiting_frames = self._load_waiting_frames()
-        self._happy_frame = self._load_happy_frame()
-        self._compact_frames = self._load_compact_frames()
-        self._yawn_frames = self._load_yawn_frames()
+        """
+        Recarrega os assets mantendo a interface
+        usada pelas configuracoes.
+        """
+        assets = (
+            self._sprite_loader
+            .load_all()
+        )
+
+        self._idle_frames = (
+            assets["idle"]
+        )
+
+        self._alert_frames = (
+            assets["alert"]
+        )
+
+        self._waiting_frames = (
+            assets["waiting"]
+        )
+
+        self._happy_frame = (
+            assets["happy"]
+        )
+
+        self._compact_frames = (
+            assets["compact"]
+        )
+
+        self._yawn_frames = (
+            assets["yawn"]
+        )
 
         self._alert_frame_index = 0
         self._compact_frame_index = 0
-
-
-    def _load_frames(
-        self,
-        subfolder,
-        filenames,
-        label,
-        missing_label=None,
-    ):
-        """
-        Carrega uma sequencia de sprites do MARVIN.
-
-        Todos os frames usam o mesmo tamanho,
-        conversao RGBA e redimensionamento NEAREST.
-        """
-        pasta = (
-            Path(__file__).resolve().parent
-            / "assets"
-            / "marvin"
-            / subfolder
-        )
-
-        frames = []
-
-        for filename in filenames:
-            arquivo = (
-                pasta
-                / filename
-            )
-
-            if not arquivo.exists():
-                descricao = (
-                    missing_label
-                    or f"Sprite {label}"
-                )
-
-                print(
-                    f"[MARVIN] "
-                    f"{descricao} nao encontrado: "
-                    f"{arquivo}"
-                )
-                continue
-
-            imagem = Image.open(
-                arquivo
-            ).convert(
-                "RGBA"
-            )
-
-            tamanho = (
-                self._normal_sprite_size()
-            )
-
-            imagem = imagem.resize(
-                (
-                    tamanho,
-                    tamanho,
-                ),
-                Image.Resampling.NEAREST,
-            )
-
-            frames.append(
-                ImageTk.PhotoImage(
-                    imagem
-                )
-            )
-
-        print(
-            f"[MARVIN] "
-            f"{len(frames)} frame(s) "
-            f"{label} carregado(s)."
-        )
-
-        return frames
-
-
-    def _load_idle_frames(self):
-        return self._load_frames(
-            "idle",
-            (
-                "01.png",
-                "02.png",
-            ),
-            label="idle",
-            missing_label="Sprite",
-        )
-
-    def _load_alert_frames(self):
-        return self._load_frames(
-            "alert",
-            (
-                "01.png",
-                "02.png",
-            ),
-            label="alert",
-            missing_label=(
-                "Sprite de alerta"
-            ),
-        )
-
-    def _load_waiting_frames(self):
-        return self._load_frames(
-            "waiting",
-            (
-                "01.png",
-                "02.png",
-                "03.png",
-            ),
-            label="waiting",
-            missing_label=(
-                "Sprite waiting"
-            ),
-        )
-
-    def _load_yawn_frames(self):
-        return self._load_frames(
-            "yawn",
-            (
-                "01.png",
-                "02.png",
-            ),
-            label="yawn",
-            missing_label="Sprite yawn",
-        )
-
-    def _load_compact_frames(self):
-        pasta = (
-            Path(__file__).resolve().parent
-            / "assets"
-            / "marvin"
-            / "compact"
-        )
-
-        arquivos = [
-            pasta / "01.png",
-            pasta / "02.png",
-            pasta / "03.png",
-        ]
-
-        imagens = []
-
-        for arquivo in arquivos:
-            if not arquivo.exists():
-                print(
-                    f"[MARVIN] Sprite compact nao encontrado: {arquivo}"
-                )
-                continue
-
-            imagens.append(
-                Image.open(arquivo).convert("RGBA")
-            )
-
-        if not imagens:
-            return []
-
-        # Descobre uma area comum envolvendo todos os pixels visiveis.
-        caixas = []
-
-        for imagem in imagens:
-            bbox = imagem.getchannel("A").getbbox()
-
-            if bbox:
-                caixas.append(bbox)
-
-        if not caixas:
-            return []
-
-        left = min(b[0] for b in caixas)
-        top = min(b[1] for b in caixas)
-        right = max(b[2] for b in caixas)
-        bottom = max(b[3] for b in caixas)
-
-        crop_box = (left, top, right, bottom)
-
-        largura = right - left
-        altura = bottom - top
-
-        compact_scale = self._compact_sprite_scale()
-
-        max_w = max(
-            1,
-            int(92 * compact_scale)
-        )
-
-        max_h = max(
-            1,
-            int(64 * compact_scale)
-        )
-
-        escala = min(
-            max_w / largura,
-            max_h / altura
-        )
-
-        novo_w = max(1, int(largura * escala))
-        novo_h = max(1, int(altura * escala))
-
-        frames = []
-
-        for imagem in imagens:
-            imagem = imagem.crop(crop_box)
-
-            imagem = imagem.resize(
-                (novo_w, novo_h),
-                Image.Resampling.NEAREST
-            )
-
-            frames.append(
-                ImageTk.PhotoImage(imagem)
-            )
-
-        print(
-            f"[MARVIN] {len(frames)} frame(s) compact carregado(s)."
-        )
-
-        return frames
-
-
-    def _load_happy_frame(self):
-        arquivo = (
-            Path(__file__).resolve().parent
-            / "assets"
-            / "marvin"
-            / "happy"
-            / "01.png"
-        )
-
-        if not arquivo.exists():
-            print(f"[MARVIN] Sprite happy nao encontrado: {arquivo}")
-            return None
-
-        imagem = Image.open(arquivo).convert("RGBA")
-        tamanho = self._normal_sprite_size()
-
-        imagem = imagem.resize(
-            (tamanho, tamanho),
-            Image.Resampling.NEAREST
-        )
-
-        frame = ImageTk.PhotoImage(imagem)
-
-        print("[MARVIN] frame happy carregado.")
-
-        return frame
 
 
     def _draw_idle_sprite(self):
