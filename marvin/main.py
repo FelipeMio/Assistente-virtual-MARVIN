@@ -1,6 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
-import threading, math, time, datetime, sys, textwrap, os
+import threading, time, datetime, sys, os
 from tkinter import messagebox
 from pathlib import Path
 
@@ -38,6 +38,7 @@ from .tray import TrayController
 from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
 from .sprite_renderer import SpriteRenderer
+from .bubble import BubbleRenderer
 from .reminders import ReminderQueue, ReminderService
 from .routine import RoutineController
 from .checklist import abrir_checklist
@@ -198,319 +199,6 @@ C = get_palette(
     )
 )
 
-
-def _bubble_layout(text, W, cx, top_y, mode="normal"):
-    """Calcula toda a geometria visual e clicavel do balao."""
-
-    wrapped = textwrap.wrap(
-        text,
-        width=26
-    )[:4]
-
-    if not wrapped:
-        return None
-
-    line_h = 15
-    py = 9
-
-    if mode == "alert":
-        button_h = 34
-
-    elif mode == "snooze":
-        button_h = 54
-
-    else:
-        button_h = 0
-
-    bw = max(
-        1,
-        W - 12
-    )
-
-    bh = (
-        len(wrapped) * line_h
-        + py * 2
-        + button_h
-    )
-
-    bx = max(
-        6,
-        cx - bw // 2
-    )
-
-    by = max(
-        6,
-        top_y - bh - 16
-    )
-
-    layout = {
-        "wrapped": wrapped,
-        "line_h": line_h,
-        "py": py,
-        "bw": bw,
-        "bh": bh,
-        "bx": bx,
-        "by": by,
-        "button_y": None,
-    }
-
-    if mode in (
-        "alert",
-        "snooze",
-    ):
-        layout["button_y"] = (
-            by
-            + py
-            + len(wrapped) * line_h
-            + 5
-        )
-
-    if mode == "alert":
-        layout["complete_x"] = (
-            bx + bw // 3
-        )
-
-        layout["snooze_x"] = (
-            bx + (bw * 2) // 3
-        )
-
-    elif mode == "snooze":
-        spacing = bw / 4
-
-        layout["option_x"] = {
-            value: (
-                bx
-                + spacing * i
-                + spacing / 2
-            )
-            for i, value in enumerate(
-                ("5", "15", "30", "60")
-            )
-        }
-
-        layout["back_y"] = (
-            layout["button_y"] + 31
-        )
-
-    return layout
-
-
-def draw_bubble(cv, t, cx, top_y, text, W, mode="normal", hover=None):
-
-    layout = _bubble_layout(
-        text,
-        W,
-        cx,
-        top_y,
-        mode
-    )
-
-    if layout is None:
-        return
-
-    wrapped = layout["wrapped"]
-    line_h = layout["line_h"]
-    py = layout["py"]
-    bw = layout["bw"]
-    bh = layout["bh"]
-    bx = layout["bx"]
-    by = layout["by"]
-
-    # ---------------------------------------------------------
-    # SOMBRA
-    # ---------------------------------------------------------
-    cv.create_rectangle(
-        bx + 2, by + 2,
-        bx + bw + 2, by + bh + 2,
-        fill="#060c14",
-        outline=""
-    )
-
-    # ---------------------------------------------------------
-    # BALÃO
-    # ---------------------------------------------------------
-    cv.create_rectangle(
-        bx, by,
-        bx + bw, by + bh,
-        fill=C["bub_bg"],
-        outline=C["bub_bd"],
-        width=2
-    )
-
-    # ---------------------------------------------------------
-    # PONTA DO BALÃO
-    # ---------------------------------------------------------
-    tip = min(
-        max(cx, bx + 16),
-        bx + bw - 16
-    )
-
-    cv.create_polygon(
-        [
-            tip - 7, by + bh,
-            tip + 7, by + bh,
-            tip, top_y - 2
-        ],
-        fill=C["bub_bg"],
-        outline=C["bub_bd"]
-    )
-
-    cv.create_line(
-        bx + 2, by + bh,
-        tip - 7, by + bh,
-        fill=C["bub_bd"],
-        width=2
-    )
-
-    cv.create_line(
-        tip + 7, by + bh,
-        bx + bw - 2, by + bh,
-        fill=C["bub_bd"],
-        width=2
-    )
-
-    # ---------------------------------------------------------
-    # TEXTO
-    # ---------------------------------------------------------
-    text_y = by + py
-
-    for i, line in enumerate(wrapped):
-
-        cv.create_text(
-            bx + bw // 2,
-            text_y + i * line_h + line_h // 2,
-            text=line,
-            fill=C["text"],
-            font=("Consolas", 8),
-            anchor="center"
-        )
-
-    # =========================================================
-    # ALERTA
-    # =========================================================
-    if mode == "alert":
-
-        button_y = layout["button_y"]
-
-        # Posicoes vindas da mesma geometria
-        # usada para detectar os cliques.
-        complete_x = layout["complete_x"]
-        snooze_x = layout["snooze_x"]
-
-        # -------------------------
-        # CONCLUIR
-        # -------------------------
-        complete_active = hover == "complete"
-
-        cv.create_oval(
-            complete_x - 11,
-            button_y,
-            complete_x + 11,
-            button_y + 22,
-            fill=C["green"] if complete_active else C["panel"],
-            outline=C["green"],
-            width=2
-        )
-
-        cv.create_text(
-            complete_x,
-            button_y + 11,
-            text="✓",
-            fill="#ffffff",
-            font=("Consolas", 11, "bold")
-        )
-
-        cv.create_text(
-            complete_x,
-            button_y + 29,
-            text="concluir",
-            fill=C["dim"],
-            font=("Consolas", 7)
-        )
-
-        # -------------------------
-        # ADIAR
-        # -------------------------
-        snooze_active = hover == "snooze"
-
-        cv.create_oval(
-            snooze_x - 11,
-            button_y,
-            snooze_x + 11,
-            button_y + 22,
-            fill=C["accent"] if snooze_active else C["panel"],
-            outline=C["accent"],
-            width=2
-        )
-
-        cv.create_text(
-            snooze_x,
-            button_y + 11,
-            text="⏰",
-            fill="#ffffff",
-            font=("Segoe UI Symbol", 9)
-        )
-
-        cv.create_text(
-            snooze_x,
-            button_y + 29,
-            text="adiar",
-            fill=C["dim"],
-            font=("Consolas", 7)
-        )
-
-    # =========================================================
-    # MENU DE ADIAMENTO
-    # =========================================================
-    elif mode == "snooze":
-
-        button_y = layout["button_y"]
-
-        options = [
-            ("5", "5m"),
-            ("15", "15m"),
-            ("30", "30m"),
-            ("60", "1h"),
-        ]
-
-        for value, label in options:
-
-            x = layout["option_x"][value]
-
-            active = hover == value
-
-            cv.create_oval(
-                x - 14,
-                button_y,
-                x + 14,
-                button_y + 24,
-                fill=C["accent"] if active else C["panel"],
-                outline=C["accent"],
-                width=1
-            )
-
-            cv.create_text(
-                x,
-                button_y + 12,
-                text=label,
-                fill="#ffffff",
-                font=("Consolas", 7, "bold")
-            )
-
-        # -------------------------
-        # VOLTAR
-        # -------------------------
-        back_y = layout["back_y"]
-
-        active = hover == "back"
-
-        cv.create_text(
-            bx + bw // 2,
-            back_y,
-            text="↩ voltar",
-            fill=C["accent"] if active else C["dim"],
-            font=("Consolas", 7, "bold")
-        )
 
 #  FRASES IDLE
 
@@ -1075,6 +763,16 @@ class MarvinCompanion:
         self.cv = tk.Canvas(self.root, width=self.W, height=self.H,
                              bg=TK, highlightthickness=0)
         self.cv.pack()
+
+        # Balao de fala e botoes interativos.
+        self._bubble_renderer = BubbleRenderer(
+            self.cv,
+            palette=C,
+            normal_size=(
+                self.W,
+                self.H,
+            ),
+        )
 
         # Sprites do MARVIN
         self._sprite_loader = SpriteLoader(
@@ -1832,13 +1530,9 @@ class MarvinCompanion:
 
 
         if self.bubble:
-            draw_bubble(
-                self.cv,
-                self.t,
-                self.W // 2,
-                top_y,
-                self.bubble,
-                self.W,
+            self._bubble_renderer.draw(
+                top_y=top_y,
+                text=self.bubble,
                 mode=self._bubble_mode,
                 hover=self._bubble_hover,
             )
@@ -1894,9 +1588,19 @@ class MarvinCompanion:
         ):
             return
 
-        hover = self._bubble_button_at(
-            event.x,
-            event.y,
+        hover = (
+            self._bubble_renderer
+            .button_at(
+                event.x,
+                event.y,
+                t=self.t,
+                text=self.bubble,
+                mode=self._bubble_mode,
+                sprite_height=(
+                    self._sprite_renderer
+                    .reminder_frame_height()
+                ),
+            )
         )
 
         if hover != self._bubble_hover:
@@ -1910,97 +1614,6 @@ class MarvinCompanion:
         if self._bubble_hover is not None:
             self._bubble_hover = None
 
-
-    def _bubble_button_at(self, x, y):
-        """
-        Retorna qual botão do balão está na posição x/y.
-        Retorna None quando não existe botão nessa posição.
-        """
-
-        if self._bubble_mode not in ("alert", "snooze"):
-            return None
-
-        if not self.bubble:
-            return None
-
-        # Usa a altura REAL do sprite de alerta.
-        # Isso mantem a area clicavel exatamente no mesmo lugar
-        # do balao, mesmo quando o tamanho do MARVIN e alterado.
-        bob = int(math.sin(self.t * 1.4) * 3)
-
-        sprite_h = (
-            self._sprite_renderer
-            .reminder_frame_height()
-        )
-
-        if sprite_h is not None:
-            top_y = (
-                self.H
-                - 8
-                + bob
-                - sprite_h
-            )
-
-        else:
-            # Nenhum sprite disponivel.
-            top_y = self.H - 8 + bob
-
-        layout = _bubble_layout(
-            self.bubble,
-            self.W,
-            self.W // 2,
-            top_y,
-            self._bubble_mode
-        )
-
-        if layout is None:
-            return None
-
-        bx = layout["bx"]
-        bw = layout["bw"]
-        button_y = layout["button_y"]
-
-        if self._bubble_mode == "alert":
-
-            complete_x = layout["complete_x"]
-            snooze_x = layout["snooze_x"]
-
-            if (
-                (x - complete_x) ** 2
-                + (y - (button_y + 11)) ** 2
-                <= 16 ** 2
-            ):
-                return "complete"
-
-            if (
-                (x - snooze_x) ** 2
-                + (y - (button_y + 11)) ** 2
-                <= 16 ** 2
-            ):
-                return "snooze"
-
-        elif self._bubble_mode == "snooze":
-
-            for value, x_button in (
-                layout["option_x"].items()
-            ):
-
-                if (
-                    (x - x_button) ** 2
-                    + (y - (button_y + 12)) ** 2
-                    <= 18 ** 2
-                ):
-                    return value
-
-            back_y = layout["back_y"]
-
-            if (
-                abs(x - (bx + bw // 2)) <= 45
-                and abs(y - back_y) <= 12
-            ):
-                return "back"
-
-        return None
 
     def _drag_end(self, e):
         if self._compact_mode:
@@ -2028,7 +1641,20 @@ class MarvinCompanion:
             save_cfg(cfg)
 
         if not self._dragging:
-            button = self._bubble_button_at(e.x, e.y)
+            button = (
+                self._bubble_renderer
+                .button_at(
+                    e.x,
+                    e.y,
+                    t=self.t,
+                    text=self.bubble,
+                    mode=self._bubble_mode,
+                    sprite_height=(
+                        self._sprite_renderer
+                        .reminder_frame_height()
+                    ),
+                )
+            )
 
             if button == "complete":
                 self.complete_task()
