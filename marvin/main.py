@@ -37,6 +37,7 @@ from .notifications import NotificationManager
 from .tray import TrayController
 from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
+from .sprite_renderer import SpriteRenderer
 from .checklist import abrir_checklist
 from .ui.home import abrir_home
 from .ui.settings import SettingsWindow as SettingsWindowUI
@@ -1078,21 +1079,37 @@ class MarvinCompanion:
             config=cfg,
         )
 
+        self._sprite_renderer = SpriteRenderer(
+            self.cv,
+            normal_size=(
+                self.W,
+                self.H,
+            ),
+            compact_size=(
+                self.COMPACT_W,
+                self.COMPACT_H,
+            ),
+            blink_min_seconds=(
+                self.BLINK_MIN_SECONDS
+            ),
+            blink_max_seconds=(
+                self.BLINK_MAX_SECONDS
+            ),
+            yawn_min_seconds=(
+                self.YAWN_MIN_SECONDS
+            ),
+            yawn_max_seconds=(
+                self.YAWN_MAX_SECONDS
+            ),
+            alert_frame_seconds=(
+                self.ALERT_FRAME_SECONDS
+            ),
+            compact_frame_seconds=(
+                self.COMPACT_FRAME_SECONDS
+            ),
+        )
+
         self._reload_sprites()
-
-        # Controle da piscada
-        self._next_blink = time.monotonic() + random.uniform(self.BLINK_MIN_SECONDS, self.BLINK_MAX_SECONDS)
-        self._blink_until = 0.0
-
-        # Controle do bocejo
-        self._next_yawn = time.monotonic() + random.uniform(self.YAWN_MIN_SECONDS, self.YAWN_MAX_SECONDS)
-        self._yawn_index = 0
-        self._yawn_last_frame = 0.0
-        self._yawn_sequence = [0, 1, 1, 1, 0]
-
-        # Controle da animacao de alerta
-        self._alert_frame_index = 0
-        self._alert_last_frame = time.monotonic()
 
         # Momento em que o lembrete atual apareceu.
         self._reminder_started_at = None
@@ -1103,11 +1120,6 @@ class MarvinCompanion:
         # 2 = waiting 02
         # 3 = waiting 03
         self._waiting_reaction_stage = 0
-
-        # Animacao visual do modo compacto.
-        self._compact_frame_index = 0
-        self._compact_last_frame = time.monotonic()
-        self._compact_sequence = [0, 0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 2, 0]
 
         # Layout, posicao e drag do modo compacto.
         self._compact = CompactModeController(
@@ -1361,230 +1373,16 @@ class MarvinCompanion:
 
     def _reload_sprites(self):
         """
-        Recarrega os assets mantendo a interface
-        usada pelas configuracoes.
+        Recarrega os assets e entrega ao renderer.
         """
         assets = (
             self._sprite_loader
             .load_all()
         )
 
-        self._idle_frames = (
-            assets["idle"]
+        self._sprite_renderer.set_assets(
+            assets
         )
-
-        self._alert_frames = (
-            assets["alert"]
-        )
-
-        self._waiting_frames = (
-            assets["waiting"]
-        )
-
-        self._happy_frame = (
-            assets["happy"]
-        )
-
-        self._compact_frames = (
-            assets["compact"]
-        )
-
-        self._yawn_frames = (
-            assets["yawn"]
-        )
-
-        self._alert_frame_index = 0
-        self._compact_frame_index = 0
-
-
-    def _draw_idle_sprite(self):
-        if not self._idle_frames:
-            return None
-
-        now = time.monotonic()
-
-        # Comeca uma piscada nova
-        if now >= self._next_blink and now >= self._blink_until:
-            self._blink_until = now + 0.14
-            self._next_blink = now + random.uniform(self.BLINK_MIN_SECONDS, self.BLINK_MAX_SECONDS)
-
-        # Frame 02 enquanto estiver piscando
-        if (
-            now < self._blink_until
-            and len(self._idle_frames) >= 2
-        ):
-            frame = self._idle_frames[1]
-
-        # Frame 01 normalmente
-        else:
-            frame = self._idle_frames[0]
-
-        self.cv.delete("all")
-
-        bob = int(math.sin(self.t * 1.4) * 3)
-
-        x = self.W // 2
-        bottom_y = self.H - 8 + bob
-
-        sprite_w = frame.width()
-        sprite_h = frame.height()
-
-        top_y = bottom_y - sprite_h
-
-        self.cv.create_image(
-            x,
-            bottom_y,
-            image=frame,
-            anchor="s"
-        )
-
-        return top_y
-
-    def _draw_yawn_sprite(self):
-        if len(self._yawn_frames) < 2:
-            self.state = "idle"
-            self._next_yawn = (
-                time.monotonic()
-                + random.uniform(self.YAWN_MIN_SECONDS, self.YAWN_MAX_SECONDS)
-            )
-            return self._draw_idle_sprite()
-
-        now = time.monotonic()
-
-        if self._yawn_last_frame == 0.0:
-            self._yawn_last_frame = now
-
-        # Troca de frame
-        if now - self._yawn_last_frame >= 0.32:
-            self._yawn_index += 1
-            self._yawn_last_frame = now
-
-        # Terminou o bocejo
-        if self._yawn_index >= len(self._yawn_sequence):
-            self.state = "idle"
-            self._yawn_index = 0
-            self._yawn_last_frame = 0.0
-
-            self._next_yawn = (
-                now + random.uniform(self.YAWN_MIN_SECONDS, self.YAWN_MAX_SECONDS)
-            )
-
-            return self._draw_idle_sprite()
-
-        indice = self._yawn_sequence[self._yawn_index]
-        frame = self._yawn_frames[indice]
-
-        self.cv.delete("all")
-
-        bob = int(math.sin(self.t * 1.4) * 3)
-
-        x = self.W // 2
-        bottom_y = self.H - 8 + bob
-        top_y = bottom_y - frame.height()
-
-        self.cv.create_image(
-            x,
-            bottom_y,
-            image=frame,
-            anchor="s"
-        )
-
-        return top_y
-
-
-    def _draw_happy_sprite(self):
-        if self._happy_frame is None:
-            return None
-
-        frame = self._happy_frame
-
-        self.cv.delete("all")
-
-        bob = int(math.sin(self.t * 1.4) * 3)
-
-        x = self.W // 2
-        bottom_y = self.H - 8 + bob
-        top_y = bottom_y - frame.height()
-
-        self.cv.create_image(
-            x,
-            bottom_y,
-            image=frame,
-            anchor="s"
-        )
-
-        return top_y
-
-
-    def _draw_alert_sprite(self):
-        if not self._alert_frames:
-            return None
-
-        now = time.monotonic()
-
-        # Troca de frame aproximadamente a cada 180 ms
-        if now - self._alert_last_frame >= self.ALERT_FRAME_SECONDS:
-            self._alert_frame_index = (
-                self._alert_frame_index + 1
-            ) % len(self._alert_frames)
-
-            self._alert_last_frame = now
-
-        frame = self._alert_frames[self._alert_frame_index]
-
-        self.cv.delete("all")
-
-        bob = int(math.sin(self.t * 1.4) * 3)
-
-        x = self.W // 2
-        bottom_y = self.H - 8 + bob
-
-        sprite_h = frame.height()
-
-        top_y = bottom_y - sprite_h
-
-        self.cv.create_image(
-            x,
-            bottom_y,
-            image=frame,
-            anchor="s"
-        )
-
-        return top_y
-
-
-    def _draw_waiting_sprite(self, indice):
-        if not self._waiting_frames:
-            return self._draw_alert_sprite()
-
-        indice = max(
-            0,
-            min(
-                indice,
-                len(self._waiting_frames) - 1
-            )
-        )
-
-        frame = self._waiting_frames[indice]
-
-        self.cv.delete("all")
-
-        bob = int(
-            math.sin(self.t * 1.4) * 3
-        )
-
-        x = self.W // 2
-        bottom_y = self.H - 8 + bob
-        top_y = bottom_y - frame.height()
-
-        self.cv.create_image(
-            x,
-            bottom_y,
-            image=frame,
-            anchor="s"
-        )
-
-        return top_y
 
 
     def _update_waiting_reaction(self):
@@ -1668,94 +1466,6 @@ class MarvinCompanion:
         )
 
 
-    def _draw_reminder_sprite(self):
-        """
-        Escolhe o sprite do lembrete conforme
-        o tempo que o usuario esta sem responder.
-        """
-
-        # Se o usuario ja abriu o menu de adiar,
-        # ele ja respondeu ao alerta.
-        if self._bubble_mode != "alert":
-            return self._draw_alert_sprite()
-
-        if self._reminder_started_at is None:
-            return self._draw_alert_sprite()
-
-        if not self._waiting_frames:
-            return self._draw_alert_sprite()
-
-        tempo = (
-            time.monotonic()
-            - self._reminder_started_at
-        )
-
-        t1, t2, t3 = self.WAITING_TIMES
-
-        # 2 minutos ou mais
-        if tempo >= t3:
-            return self._draw_waiting_sprite(2)
-
-        # 1 minuto e 30 segundos
-        if tempo >= t2:
-            return self._draw_waiting_sprite(1)
-
-        # 1 minuto
-        if tempo >= t1:
-            return self._draw_waiting_sprite(0)
-
-        # Antes de 1 minuto continua usando
-        # a animacao normal de alerta.
-        return self._draw_alert_sprite()
-
-
-    def _draw_compact_sprite(self):
-        if not self._compact_frames:
-            return None
-
-        now = time.monotonic()
-
-        # 01 -> 02 -> 03 -> 02 -> ...
-        if now - self._compact_last_frame >= self.COMPACT_FRAME_SECONDS:
-            self._compact_frame_index = (
-                self._compact_frame_index + 1
-            ) % len(self._compact_sequence)
-
-            self._compact_last_frame = now
-
-        indice = self._compact_sequence[
-            self._compact_frame_index
-        ]
-
-        indice = min(
-            indice,
-            len(self._compact_frames) - 1
-        )
-
-        frame = self._compact_frames[indice]
-
-        self.cv.delete("all")
-
-        # Janela compacta real.
-        x = self.COMPACT_W // 2
-
-        # 1 px acima da borda inferior:
-        # visualmente fica encostado na barra
-        # sem cortar o sprite.
-        bottom_y = self.COMPACT_H - 1
-
-        self.cv.create_image(
-            x,
-            bottom_y,
-            image=frame,
-            anchor="s"
-        )
-
-        return bottom_y - frame.height()
-
-
-    # ── Nao Perturbe ─────────────────────────────────────────────────────────
-
     def _np_label(self):
         if self._compact_enabled:
             return "Mostrar MARVIN"
@@ -1773,8 +1483,7 @@ class MarvinCompanion:
         self._bubble_hover = None
         self.state = "idle"
 
-        self._compact_frame_index = 0
-        self._compact_last_frame = time.monotonic()
+        self._sprite_renderer.reset_compact_animation()
 
         if ativando:
             # Durante lembrete, apenas guarda
@@ -2218,8 +1927,6 @@ class MarvinCompanion:
     def _animate(self):
         self.t += 0.05
 
-        # Se o usuario escolheu modo compacto e nao existe mais
-        # nenhum alerta/fala, volta automaticamente para a cabeca.
         if (
             self._compact_enabled
             and not self._compact_mode
@@ -2227,42 +1934,52 @@ class MarvinCompanion:
             and self.state == "idle"
             and not self.bubble
         ):
-            self._compact_frame_index = 0
-            self._compact_last_frame = time.monotonic()
+            self._sprite_renderer.reset_compact_animation()
 
             self._compact.enter(
                 remember_normal=False
             )
 
-        # Modo compacto: somente desenha os frames da cabeca.
+
         if self._compact_mode:
-            self._draw_compact_sprite()
-            self.root.after(self.ANIMATION_TICK_MS, self._animate)
+            self._sprite_renderer.draw_compact()
+
+            self.root.after(
+                self.ANIMATION_TICK_MS,
+                self._animate,
+            )
+
             return
+
 
         now = time.monotonic()
 
         self._update_waiting_reaction()
 
-        # Bocejo aleatorio somente quando MARVIN esta livre
+
         if (
             self.state == "idle"
             and not self.bubble
             and not self._reminder_queue
-            and self._yawn_frames
-            and now >= self._next_yawn
+            and self._sprite_renderer.yawn_due(
+                now
+            )
         ):
             self.state = "yawn"
-            self._yawn_index = 0
-            self._yawn_last_frame = now
+
+            self._sprite_renderer.start_yawn(
+                now
+            )
+
+
         if self.b_timer > 0:
 
-            # Usa relogio monotonic em vez de assumir
-            # que cada frame levou exatamente 50 ms.
             if self._bubble_deadline is None:
                 self._bubble_deadline = (
                     now
-                    + float(self.b_timer) / 1000.0
+                    + float(
+                        self.b_timer
+                    ) / 1000.0
                 )
 
             restante_ms = max(
@@ -2270,61 +1987,100 @@ class MarvinCompanion:
                 (
                     self._bubble_deadline
                     - now
-                ) * 1000.0
+                ) * 1000.0,
             )
 
             self.b_timer = restante_ms
 
+
             if restante_ms <= 0:
                 self._bubble_deadline = None
 
-                # Nunca fecha automaticamente um lembrete.
                 if self._reminder_queue:
                     self.b_timer = 0
 
-                # Baloes normais continuam fechando pelo tempo.
                 else:
                     self.b_timer = 0
                     self.bubble = ""
                     self.state = "idle"
 
-        # Sprite de lembrete.
-        # Depois de algum tempo sem resposta,
-        # troca progressivamente para os sprites waiting.
+
         if (
             self.state == "alert"
             and (
-                self._alert_frames
-                or self._waiting_frames
+                self._sprite_renderer
+                .has_alert_or_waiting
             )
         ):
-            top_y = self._draw_reminder_sprite()
+            top_y = (
+                self._sprite_renderer
+                .draw_reminder(
+                    self.t,
+                    bubble_mode=(
+                        self._bubble_mode
+                    ),
+                    reminder_started_at=(
+                        self._reminder_started_at
+                    ),
+                    waiting_times=(
+                        self.WAITING_TIMES
+                    ),
+                )
+            )
 
-        # Sprite feliz
+
         elif (
             self.state == "happy"
-            and self._happy_frame is not None
+            and self._sprite_renderer.has_happy
         ):
-            top_y = self._draw_happy_sprite()
+            top_y = (
+                self._sprite_renderer
+                .draw_happy(
+                    self.t
+                )
+            )
 
-        # Bocejo
+
         elif (
             self.state == "yawn"
-            and self._yawn_frames
+            and self._sprite_renderer.has_yawn
         ):
-            top_y = self._draw_yawn_sprite()
+            (
+                top_y,
+                yawn_finished,
+            ) = (
+                self._sprite_renderer
+                .draw_yawn(
+                    self.t
+                )
+            )
 
-        # Sprite normal
+            if yawn_finished:
+                self.state = "idle"
+
+
         elif (
-            self.state in ("idle", "talking")
-            and self._idle_frames
+            self.state
+            in ("idle", "talking")
+            and self._sprite_renderer.has_idle
         ):
-            top_y = self._draw_idle_sprite()
+            top_y = (
+                self._sprite_renderer
+                .draw_idle(
+                    self.t
+                )
+            )
 
-        # Fallback caso nenhum sprite PNG esteja disponivel.
+
         else:
-            self.cv.delete("all")
-            top_y = self.H - 8
+            self.cv.delete(
+                "all"
+            )
+
+            top_y = (
+                self.H - 8
+            )
+
 
         if self.bubble:
             draw_bubble(
@@ -2335,12 +2091,15 @@ class MarvinCompanion:
                 self.bubble,
                 self.W,
                 mode=self._bubble_mode,
-                hover=self._bubble_hover
+                hover=self._bubble_hover,
             )
 
-        self.root.after(self.ANIMATION_TICK_MS, self._animate)
 
-    # ── Drag ──────────────────────────────────────────────────────────────────
+        self.root.after(
+            self.ANIMATION_TICK_MS,
+            self._animate,
+        )
+
 
     def _drag_start(self, e):
         self._dx, self._dy = e.x, e.y
@@ -2420,18 +2179,12 @@ class MarvinCompanion:
         # do balao, mesmo quando o tamanho do MARVIN e alterado.
         bob = int(math.sin(self.t * 1.4) * 3)
 
-        if self._alert_frames:
-            sprite_h = self._alert_frames[0].height()
+        sprite_h = (
+            self._sprite_renderer
+            .reminder_frame_height()
+        )
 
-            top_y = (
-                self.H
-                - 8
-                + bob
-                - sprite_h
-            )
-        elif self._waiting_frames:
-            sprite_h = self._waiting_frames[0].height()
-
+        if sprite_h is not None:
             top_y = (
                 self.H
                 - 8
