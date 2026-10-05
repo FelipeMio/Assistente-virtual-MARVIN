@@ -198,7 +198,17 @@ class ReminderService:
                     continue
 
 
-                if lemb:
+                # Tarefas recorrentes usam a flag "lembrado"
+                # para evitar repetir a mesma ocorrencia.
+                #
+                # Tarefas comuns nao podem ser descartadas por
+                # essa flag: se o MARVIN foi fechado antes de o
+                # usuario concluir/adiar, o alerta precisa voltar
+                # na proxima execucao.
+                if (
+                    lemb
+                    and rep != "Nunca"
+                ):
                     continue
 
 
@@ -281,8 +291,24 @@ class ReminderService:
                 ).total_seconds()
 
 
+                # Tarefa comum:
+                # depois que vence, continua pendente ate
+                # o usuario concluir ou adiar.
+                if rep == "Nunca":
+                    due = (
+                        diff >= 0
+                    )
+
+                # Tarefa recorrente:
+                # mantem a janela curta da ocorrencia atual.
+                else:
+                    due = (
+                        0 <= diff < 90
+                    )
+
+
                 if (
-                    0 <= diff < 90
+                    due
                     and not self._stop_event.is_set()
                 ):
                     try:
