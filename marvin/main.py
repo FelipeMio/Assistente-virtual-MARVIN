@@ -1,6 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
-import threading, time, datetime, sys, os
+import time, datetime, sys, os
 from tkinter import messagebox
 from pathlib import Path
 
@@ -32,8 +32,9 @@ if sys.platform == "win32":
 from .config import load_cfg, save_cfg
 from .theme import get_palette, get_modern_palette
 
-from .extension_loader import carregar_extensoes
 from .notifications import NotificationManager
+from .extension_loader import carregar_extensoes
+from .lifecycle import LifecycleController
 from .tray import TrayController
 from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
@@ -1031,19 +1032,42 @@ class MarvinCompanion:
         self.root.bind_all("<Control-Shift-N>",
                             lambda e: NewTaskWindow(self.root, self))
 
-        self._tray.start()
+        # Ciclo de vida dos servicos principais.
+        self._lifecycle = LifecycleController(
+            self.root,
+            self,
+            tray=self._tray,
+            reminders=self._reminders,
+            notification_factory=(
+                NotificationManager
+            ),
+            set_notifications=lambda value:
+                setattr(
+                    self,
+                    "notifications",
+                    value,
+                ),
+            load_extensions=(
+                carregar_extensoes
+            ),
+            cleanup_database=(
+                db_limpar_antigas
+            ),
+            start_day=(
+                self._routine.start_day
+            ),
+            start_animation=(
+                self._animate
+            ),
+            start_day_delay_ms=900,
+        )
 
-        self._animate()
-        self._reminders.start()
+        self._lifecycle.start()
 
-        # Sistema central de notificacoes do MARVIN.
-        self.notifications = NotificationManager()
-
-        # Carrega extensoes opcionais instaladas.
-        self._extensions = carregar_extensoes(self)
-
-        threading.Thread(target=db_limpar_antigas, daemon=True).start()
-        self.root.after(900, self._routine.start_day)
+        # Ponte temporaria usada pela Home.
+        self._extensions = (
+            self._lifecycle.extensions
+        )
 
     # ── Bandeja do Windows ─────────────────────────────────────────────────
 
@@ -1686,9 +1710,8 @@ class MarvinCompanion:
     def _on_close(self):
         """Encerra completamente o MARVIN."""
 
-        # Encerra o monitor de lembretes.
         try:
-            self._reminders.stop()
+            self._lifecycle.stop()
         except Exception:
             pass
 
@@ -1699,11 +1722,6 @@ class MarvinCompanion:
                 cfg["pos_x"] = self.root.winfo_x()
                 cfg["pos_y"] = self.root.winfo_y()
                 save_cfg(cfg)
-        except Exception:
-            pass
-
-        try:
-            self._tray.stop()
         except Exception:
             pass
 
