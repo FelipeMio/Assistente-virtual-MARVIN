@@ -39,6 +39,7 @@ from .compact_mode import CompactModeController
 from .sprites import SpriteLoader
 from .sprite_renderer import SpriteRenderer
 from .bubble import BubbleRenderer
+from .mouse_interaction import MouseInteractionController
 from .reminders import ReminderQueue, ReminderService
 from .routine import RoutineController
 from .checklist import abrir_checklist
@@ -857,14 +858,48 @@ class MarvinCompanion:
         )
 
         self._bubble_deadline = None
-        self._panel_open     = False
-        self._dragging       = False
+        self._panel_open = False
 
-        # Interação do balão de lembrete
+        # Bubble interaction state.
         self._bubble_mode = "normal"
         self._bubble_hover = None
-        self._drag_dist      = 0
-        self._dx = self._dy  = 0
+
+        # Mouse interaction.
+        self._mouse = MouseInteractionController(
+            self.root,
+            self.cv,
+            config=cfg,
+            save_config=save_cfg,
+            compact=self._compact,
+            compact_mode=lambda:
+                self._compact_mode,
+            bubble_button_at=lambda x, y:
+                self._bubble_renderer.button_at(
+                    x,
+                    y,
+                    t=self.t,
+                    text=self.bubble,
+                    mode=self._bubble_mode,
+                    sprite_height=(
+                        self._sprite_renderer
+                        .reminder_frame_height()
+                    ),
+                ),
+            get_hover=lambda:
+                self._bubble_hover,
+            set_hover=lambda value:
+                setattr(
+                    self,
+                    "_bubble_hover",
+                    value,
+                ),
+            on_button=(
+                self._handle_bubble_button
+            ),
+            on_right_click=(
+                self._on_click
+            ),
+        )
 
         # Bandeja do Windows
         self._is_hidden = False
@@ -935,22 +970,7 @@ class MarvinCompanion:
         self._routine.schedule_idle()
 
         # Eventos
-        self.cv.bind("<ButtonPress-1>",   self._drag_start)
-        self.cv.bind("<B1-Motion>",       self._drag_move)
-        self.cv.bind("<ButtonRelease-1>", self._drag_end)
-        self.cv.bind("<Button-3>",         self._on_click)
-
-        # Atualiza o hover dos botoes do balao
-        # enquanto o mouse se move.
-        self.cv.bind(
-            "<Motion>",
-            self._on_mouse_motion,
-        )
-
-        self.cv.bind(
-            "<Leave>",
-            self._on_mouse_leave,
-        )
+        self._mouse.bind()
 
         self.root.protocol("WM_DELETE_WINDOW", self._hide_marvin)
         self.root.bind_all("<Control-Shift-N>",
@@ -1115,13 +1135,16 @@ class MarvinCompanion:
         self,
         distance,
     ):
-        self._drag_dist = max(
-            self._drag_dist,
-            int(distance),
+        mouse = getattr(
+            self,
+            "_mouse",
+            None,
         )
 
-        if self._drag_dist > 4:
-            self._dragging = True
+        if mouse is not None:
+            mouse.report_compact_drag_distance(
+                distance
+            )
 
 
     def _reload_sprites(self):
@@ -1544,172 +1567,93 @@ class MarvinCompanion:
         )
 
 
-    def _drag_start(self, e):
-        self._dx, self._dy = e.x, e.y
-        self._drag_dist = 0
-
-        if self._compact_mode:
-            self._compact.begin_drag()
-
-
-    def _drag_move(self, e):
-        # Compacto usa o loop global do Windows.
-        if self._compact_mode:
-            return
-
-        dx = e.x - self._dx
-        dy = e.y - self._dy
-
-        self._drag_dist += (
-            abs(dx) + abs(dy)
-        )
-
-        if self._drag_dist > 4:
-            self._dragging = True
-
-        x = self.root.winfo_x() + dx
-        y = self.root.winfo_y() + dy
-
-        self.root.geometry(
-            f"+{x}+{y}"
-        )
-
-
-    def _on_mouse_motion(
+    def _handle_bubble_button(
         self,
-        event,
+        button,
     ):
-        # Durante um arraste nao precisamos
-        # calcular hover dos botoes do balao.
-        if getattr(
-            self,
-            "_dragging",
-            False,
-        ):
-            return
+        """
+        Executa a acao associada ao botao
+        identificado pelo BubbleRenderer.
+        """
 
-        hover = (
-            self._bubble_renderer
-            .button_at(
-                event.x,
-                event.y,
-                t=self.t,
-                text=self.bubble,
-                mode=self._bubble_mode,
-                sprite_height=(
-                    self._sprite_renderer
-                    .reminder_frame_height()
-                ),
-            )
-        )
-
-        if hover != self._bubble_hover:
-            self._bubble_hover = hover
+        if button == "complete":
+            self.complete_task()
 
 
-    def _on_mouse_leave(
-        self,
-        event=None,
-    ):
-        if self._bubble_hover is not None:
+        elif button == "snooze":
+            self._reminder_started_at = None
+            self._waiting_reaction_stage = 0
             self._bubble_hover = None
 
+            task = self.reminded_task
 
-    def _drag_end(self, e):
-        if self._compact_mode:
-            compact_distance = (
-                self._compact.finish_drag()
-            )
-
-            self._drag_dist = max(
-                self._drag_dist,
-                compact_distance,
-            )
-
-            if self._drag_dist > 4:
-                self._dragging = True
-
-        else:
-            cfg["pos_x"] = self.root.winfo_x()
-            cfg["pos_y"] = self.root.winfo_y()
-
-            self._compact.set_normal_position(
-                cfg["pos_x"],
-                cfg["pos_y"],
-            )
-
-            save_cfg(cfg)
-
-        if not self._dragging:
-            button = (
-                self._bubble_renderer
-                .button_at(
-                    e.x,
-                    e.y,
-                    t=self.t,
-                    text=self.bubble,
-                    mode=self._bubble_mode,
-                    sprite_height=(
-                        self._sprite_renderer
-                        .reminder_frame_height()
-                    ),
+            if task:
+                SnoozeWindow(
+                    self.root,
+                    self,
+                    task,
                 )
+
+
+        elif button in (
+            "5",
+            "15",
+            "30",
+            "60",
+        ):
+            task = self.reminded_task
+
+            if task:
+                from datetime import (
+                    datetime,
+                    timedelta,
+                )
+
+                minutes = int(
+                    button
+                )
+
+                new_time = (
+                    datetime.now()
+                    + timedelta(
+                        minutes=minutes
+                    )
+                )
+
+                new_date = (
+                    new_time.strftime(
+                        "%Y-%m-%d"
+                    )
+                )
+
+                new_hour = (
+                    new_time.strftime(
+                        "%H:%M"
+                    )
+                )
+
+                db_adiar(
+                    task[0],
+                    new_date,
+                    new_hour,
+                )
+
+                self._bubble_mode = "normal"
+                self._bubble_hover = None
+
+                self._next_reminder()
+
+
+        elif button == "back":
+            self._reminder_started_at = (
+                time.monotonic()
             )
 
-            if button == "complete":
-                self.complete_task()
+            self._waiting_reaction_stage = 0
 
-            elif button == "snooze":
-                # O usuario respondeu ao alerta.
-                # A escolha do tempo agora acontece
-                # na janela moderna de adiamento.
-                self._reminder_started_at = None
-                self._waiting_reaction_stage = 0
-                self._bubble_hover = None
+            self._bubble_mode = "alert"
+            self._bubble_hover = None
 
-                task = self.reminded_task
-
-                if task:
-                    SnoozeWindow(
-                        self.root,
-                        self,
-                        task
-                    )
-
-            elif button in ("5", "15", "30", "60"):
-                task = self.reminded_task
-
-                if task:
-                    from datetime import datetime, timedelta
-
-                    minutos = int(button)
-                    novo_horario = datetime.now() + timedelta(minutes=minutos)
-
-                    nova_data = novo_horario.strftime("%Y-%m-%d")
-                    nova_hora = novo_horario.strftime("%H:%M")
-
-                    db_adiar(
-                        task[0],
-                        nova_data,
-                        nova_hora
-                    )
-
-                    self._bubble_mode = "normal"
-                    self._bubble_hover = None
-                    self._next_reminder()
-
-            elif button == "back":
-                # Voltou sem escolher adiamento:
-                # comeca novamente a contar a espera.
-                self._reminder_started_at = time.monotonic()
-                self._waiting_reaction_stage = 0
-
-                self._bubble_mode = "alert"
-                self._bubble_hover = None
-
-
-        self._dragging = False
-        self._drag_dist = 0
 
     def _on_click(self, e=None):
         # Durante alertas, toda interacao acontece no proprio balao.
