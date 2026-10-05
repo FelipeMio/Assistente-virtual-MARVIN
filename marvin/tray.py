@@ -66,6 +66,7 @@ class TrayController:
 
         self._icon = None
         self._loop_started = False
+        self._action_job = None
         self._stopped = False
 
 
@@ -96,16 +97,22 @@ class TrayController:
         self._loop_started = True
 
         try:
-            self.root.after(
-                100,
-                self._process_actions,
+            self._action_job = (
+                self.root.after(
+                    100,
+                    self._process_actions,
+                )
             )
 
         except tk.TclError:
+            self._action_job = None
             self._loop_started = False
 
 
+
     def _process_actions(self):
+
+        self._action_job = None
 
         if self._stopped:
             self._loop_started = False
@@ -132,14 +139,23 @@ class TrayController:
             pass
 
 
+        if self._stopped:
+            self._loop_started = False
+            return
+
+
         try:
-            self.root.after(
-                100,
-                self._process_actions,
+            self._action_job = (
+                self.root.after(
+                    100,
+                    self._process_actions,
+                )
             )
 
         except tk.TclError:
+            self._action_job = None
             self._loop_started = False
+
 
 
     def _image(self):
@@ -364,6 +380,20 @@ class TrayController:
     def stop(self):
 
         self._stopped = True
+        self._loop_started = False
+
+        job = self._action_job
+        self._action_job = None
+
+        if job is not None:
+            try:
+                self.root.after_cancel(
+                    job
+                )
+
+            except Exception:
+                pass
+
 
         icon = self._icon
         self._icon = None
@@ -376,3 +406,4 @@ class TrayController:
 
         except Exception:
             pass
+

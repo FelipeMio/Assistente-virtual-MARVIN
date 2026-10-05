@@ -149,6 +149,23 @@ class ReminderService:
     def stop(self):
         self._stop_event.set()
 
+        thread = self._thread
+
+        if thread is None:
+            return
+
+        if thread is threading.current_thread():
+            return
+
+        if thread.is_alive():
+            thread.join(
+                timeout=2.0
+            )
+
+        if not thread.is_alive():
+            self._thread = None
+
+
 
     def _run(self):
         while not self._stop_event.wait(

@@ -71,6 +71,7 @@ class RoutineController:
         )
 
         self._idle_job = None
+        self._stopped = False
 
 
     # ========================================================
@@ -408,6 +409,28 @@ class RoutineController:
     # IDLE SPEECH
     # ========================================================
 
+    def start(self):
+        self._stopped = False
+        self.schedule_idle()
+
+
+    def stop(self):
+        self._stopped = True
+
+        job = self._idle_job
+        self._idle_job = None
+
+        if job is None:
+            return
+
+        try:
+            self.root.after_cancel(
+                job
+            )
+
+        except Exception:
+            pass
+
     def idle_interval_ms(self):
         try:
             seconds = int(
@@ -431,6 +454,9 @@ class RoutineController:
 
 
     def schedule_idle(self):
+        if self._stopped:
+            return
+
         if self._idle_job is not None:
 
             try:
@@ -462,8 +488,12 @@ class RoutineController:
         )
 
 
+
     def _idle_message(self):
         self._idle_job = None
+
+        if self._stopped:
+            return
 
 
         if self.idle_interval_ms() <= 0:
@@ -496,3 +526,4 @@ class RoutineController:
 
 
         self.schedule_idle()
+

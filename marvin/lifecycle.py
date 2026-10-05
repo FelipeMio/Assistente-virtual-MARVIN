@@ -15,12 +15,14 @@ class LifecycleController:
         *,
         tray,
         reminders,
+        routine,
         notification_factory,
         set_notifications,
         load_extensions,
         cleanup_database,
         start_day,
         start_animation,
+        stop_animation,
         start_day_delay_ms=900,
     ):
         self.root = root
@@ -28,6 +30,7 @@ class LifecycleController:
 
         self.tray = tray
         self.reminders = reminders
+        self.routine = routine
 
         self._notification_factory = (
             notification_factory
@@ -51,6 +54,10 @@ class LifecycleController:
 
         self._start_animation = (
             start_animation
+        )
+
+        self._stop_animation = (
+            stop_animation
         )
 
         self.start_day_delay_ms = int(
@@ -88,7 +95,10 @@ class LifecycleController:
         self._stopped = False
 
 
-        # Preserve previous startup order.
+        # Todos os timers e servicos passam
+        # a possuir um unico owner.
+        self.routine.start()
+
         self.tray.start()
 
         self._start_animation()
@@ -153,6 +163,7 @@ class LifecycleController:
             self._start_day_job = None
 
 
+
     def _run_cleanup(self):
         try:
             self._cleanup_database()
@@ -193,6 +204,16 @@ class LifecycleController:
 
         self._cancel_start_day()
 
+        self._stop_service(
+            self.routine,
+            "rotina",
+        )
+
+        self._stop_callback(
+            self._stop_animation,
+            "animacao",
+        )
+
         self._stop_extensions()
 
         self._stop_service(
@@ -204,6 +225,9 @@ class LifecycleController:
             self.tray,
             "bandeja",
         )
+
+        self._join_cleanup_thread()
+
 
 
     def _cancel_start_day(self):
@@ -245,6 +269,42 @@ class LifecycleController:
                     f"{type(extension).__name__}: "
                     f"{exc}"
                 )
+
+
+    def _join_cleanup_thread(self):
+        thread = self._cleanup_thread
+
+        if thread is None:
+            return
+
+        if thread is threading.current_thread():
+            return
+
+        if thread.is_alive():
+            thread.join(
+                timeout=2.0
+            )
+
+        if not thread.is_alive():
+            self._cleanup_thread = None
+
+
+    @staticmethod
+    def _stop_callback(
+        callback,
+        name,
+    ):
+        if not callable(callback):
+            return
+
+        try:
+            callback()
+
+        except Exception as exc:
+            print(
+                "[MARVIN] Erro ao encerrar "
+                f"{name}: {exc}"
+            )
 
 
     @staticmethod

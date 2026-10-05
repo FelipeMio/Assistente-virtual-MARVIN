@@ -849,6 +849,10 @@ class MarvinCompanion:
         self.bubble          = ""
         self.b_timer         = 0
 
+        # Animation lifecycle.
+        self._animation_running = False
+        self._animation_job = None
+
         # Monitoramento de lembretes.
         self._reminders = ReminderService(
             self.root,
@@ -1023,8 +1027,6 @@ class MarvinCompanion:
                 ),
         )
 
-        self._routine.schedule_idle()
-
         # Eventos
         self._mouse.bind()
 
@@ -1038,6 +1040,7 @@ class MarvinCompanion:
             self,
             tray=self._tray,
             reminders=self._reminders,
+            routine=self._routine,
             notification_factory=(
                 NotificationManager
             ),
@@ -1057,7 +1060,10 @@ class MarvinCompanion:
                 self._routine.start_day
             ),
             start_animation=(
-                self._animate
+                self._start_animation
+            ),
+            stop_animation=(
+                self._stop_animation
             ),
             start_day_delay_ms=900,
         )
@@ -1473,7 +1479,37 @@ class MarvinCompanion:
 
     # ── Animacao ──────────────────────────────────────────────────────────────
 
+    def _start_animation(self):
+        if self._animation_running:
+            return
+
+        self._animation_running = True
+        self._animate()
+
+
+    def _stop_animation(self):
+        self._animation_running = False
+
+        job = self._animation_job
+        self._animation_job = None
+
+        if job is None:
+            return
+
+        try:
+            self.root.after_cancel(
+                job
+            )
+
+        except Exception:
+            pass
+
     def _animate(self):
+        if not self._animation_running:
+            return
+
+        self._animation_job = None
+
         self.t += 0.05
 
         if (
@@ -1493,10 +1529,17 @@ class MarvinCompanion:
         if self._compact_mode:
             self._sprite_renderer.draw_compact()
 
-            self.root.after(
-                self.ANIMATION_TICK_MS,
-                self._animate,
-            )
+            try:
+                self._animation_job = (
+                    self.root.after(
+                        self.ANIMATION_TICK_MS,
+                        self._animate,
+                    )
+                )
+
+            except tk.TclError:
+                self._animation_job = None
+                self._animation_running = False
 
             return
 
@@ -1640,10 +1683,18 @@ class MarvinCompanion:
             )
 
 
-        self.root.after(
-            self.ANIMATION_TICK_MS,
-            self._animate,
-        )
+        try:
+            self._animation_job = (
+                self.root.after(
+                    self.ANIMATION_TICK_MS,
+                    self._animate,
+                )
+            )
+
+        except tk.TclError:
+            self._animation_job = None
+            self._animation_running = False
+
 
 
     def _enqueue(self, row):
@@ -1715,6 +1766,13 @@ class MarvinCompanion:
         except Exception:
             pass
 
+        # Cancela callbacks do drag compacto
+        # antes de destruir o Tk.
+        try:
+            self._compact.finish_drag()
+        except Exception:
+            pass
+
         try:
             if self._compact_mode:
                 self._compact.save_position()
@@ -1729,6 +1787,7 @@ class MarvinCompanion:
             self.root.destroy()
         except tk.TclError:
             pass
+
 
     def run(self):
         self.root.mainloop()
