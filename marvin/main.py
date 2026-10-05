@@ -40,6 +40,7 @@ from .sprites import SpriteLoader
 from .sprite_renderer import SpriteRenderer
 from .bubble import BubbleRenderer
 from .mouse_interaction import MouseInteractionController
+from .interaction_actions import InteractionActionController
 from .reminders import ReminderQueue, ReminderService
 from .routine import RoutineController
 from .checklist import abrir_checklist
@@ -858,11 +859,63 @@ class MarvinCompanion:
         )
 
         self._bubble_deadline = None
-        self._panel_open = False
 
         # Bubble interaction state.
         self._bubble_mode = "normal"
         self._bubble_hover = None
+
+        # Interaction actions.
+        self._interaction_actions = (
+            InteractionActionController(
+                self.root,
+                self,
+                get_bubble_mode=lambda:
+                    self._bubble_mode,
+                set_bubble_mode=lambda value:
+                    setattr(
+                        self,
+                        "_bubble_mode",
+                        value,
+                    ),
+                set_bubble_hover=lambda value:
+                    setattr(
+                        self,
+                        "_bubble_hover",
+                        value,
+                    ),
+                reminder_active=lambda:
+                    bool(
+                        self._reminder_queue
+                    ),
+                current_reminder=lambda:
+                    self.reminded_task,
+                complete_task=(
+                    self.complete_task
+                ),
+                next_reminder=(
+                    self._next_reminder
+                ),
+                set_reminder_started_at=lambda value:
+                    setattr(
+                        self,
+                        "_reminder_started_at",
+                        value,
+                    ),
+                set_waiting_stage=lambda value:
+                    setattr(
+                        self,
+                        "_waiting_reaction_stage",
+                        value,
+                    ),
+                snooze_factory=(
+                    SnoozeWindow
+                ),
+                panel_factory=(
+                    InteractionPanel
+                ),
+                db_snooze=db_adiar,
+            )
+        )
 
         # Mouse interaction.
         self._mouse = MouseInteractionController(
@@ -894,10 +947,12 @@ class MarvinCompanion:
                     value,
                 ),
             on_button=(
-                self._handle_bubble_button
+                self._interaction_actions
+                .handle_bubble_button
             ),
             on_right_click=(
-                self._on_click
+                self._interaction_actions
+                .open_panel
             ),
         )
 
@@ -1566,139 +1621,6 @@ class MarvinCompanion:
             self._animate,
         )
 
-
-    def _handle_bubble_button(
-        self,
-        button,
-    ):
-        """
-        Executa a acao associada ao botao
-        identificado pelo BubbleRenderer.
-        """
-
-        if button == "complete":
-            self.complete_task()
-
-
-        elif button == "snooze":
-            self._reminder_started_at = None
-            self._waiting_reaction_stage = 0
-            self._bubble_hover = None
-
-            task = self.reminded_task
-
-            if task:
-                SnoozeWindow(
-                    self.root,
-                    self,
-                    task,
-                )
-
-
-        elif button in (
-            "5",
-            "15",
-            "30",
-            "60",
-        ):
-            task = self.reminded_task
-
-            if task:
-                from datetime import (
-                    datetime,
-                    timedelta,
-                )
-
-                minutes = int(
-                    button
-                )
-
-                new_time = (
-                    datetime.now()
-                    + timedelta(
-                        minutes=minutes
-                    )
-                )
-
-                new_date = (
-                    new_time.strftime(
-                        "%Y-%m-%d"
-                    )
-                )
-
-                new_hour = (
-                    new_time.strftime(
-                        "%H:%M"
-                    )
-                )
-
-                db_adiar(
-                    task[0],
-                    new_date,
-                    new_hour,
-                )
-
-                self._bubble_mode = "normal"
-                self._bubble_hover = None
-
-                self._next_reminder()
-
-
-        elif button == "back":
-            self._reminder_started_at = (
-                time.monotonic()
-            )
-
-            self._waiting_reaction_stage = 0
-
-            self._bubble_mode = "alert"
-            self._bubble_hover = None
-
-
-    def _on_click(self, e=None):
-        # Durante alertas, toda interacao acontece no proprio balao.
-        if self._bubble_mode in ("alert", "snooze"):
-            return
-
-        if self._reminder_queue:
-            return
-
-        if self._panel_open:
-            return
-
-        self._panel_open = True
-
-        try:
-            panel = InteractionPanel(
-                self.root,
-                self,
-                mode="idle"
-            )
-
-        except Exception as exc:
-            # Se a criacao do painel falhar, libera
-            # imediatamente novos cliques no MARVIN.
-            self._panel_open = False
-
-            print(
-                f"[MARVIN] Erro ao abrir InteractionPanel: {exc}"
-            )
-
-            return
-
-        panel.win.bind(
-            "<Destroy>",
-            lambda e: setattr(
-                self,
-                "_panel_open",
-                False
-            )
-        )
-
-
- 
-
-    # ── Lembretes ─────────────────────────────────────────────────────────────
 
     def _enqueue(self, row):
         tid = row[0]
