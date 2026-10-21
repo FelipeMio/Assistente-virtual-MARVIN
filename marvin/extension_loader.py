@@ -3,6 +3,8 @@ import logging
 import sys
 from pathlib import Path
 
+from .extension_api import ExtensionAPI
+
 
 logger = logging.getLogger(
     "marvin.extensions"
@@ -74,7 +76,8 @@ def carregar_extensoes(companion):
                 )
                 continue
 
-            objetos = iniciar(companion)
+            api = ExtensionAPI(companion)
+            objetos = iniciar(api)
 
             if objetos:
                 if isinstance(
