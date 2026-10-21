@@ -1,4 +1,5 @@
 import json
+import logging
 import queue
 import sys
 import time
@@ -8,6 +9,11 @@ from pathlib import Path
 from .alert import B2BAlertWindow
 from .monitor import B2BTelegramMonitor
 from .parser import extrair_arquivos
+
+
+logger = logging.getLogger(
+    "marvin.extensions.b2b_telegram"
+)
 
 
 CONFIG_FILE = (
@@ -36,10 +42,9 @@ def _carregar_config():
             )
         )
 
-    except Exception as exc:
-        print(
-            "[B2B Telegram] "
-            f"Erro ao carregar configuracao: {exc}"
+    except Exception:
+        logger.exception(
+            "Erro ao carregar configuracao."
         )
         return None
 
@@ -61,8 +66,7 @@ def iniciar_extensao(comp):
     config = _carregar_config()
 
     if not config:
-        print(
-            "[B2B Telegram] "
+        logger.info(
             "Extensao instalada, mas nao configurada."
         )
         return []
@@ -71,8 +75,7 @@ def iniciar_extensao(comp):
         "enabled",
         False,
     ):
-        print(
-            "[B2B Telegram] "
+        logger.info(
             "Monitor desativado."
         )
         return []
@@ -97,8 +100,7 @@ def iniciar_extensao(comp):
             sender_username,
         ]
     ):
-        print(
-            "[B2B Telegram] "
+        logger.warning(
             "Configuracao incompleta."
         )
         return []
@@ -211,11 +213,9 @@ def iniciar_extensao(comp):
                 comp.b_timer = 0
                 comp.state = "idle"
 
-        except Exception as exc:
-            print(
-                "[B2B Telegram] "
-                "Erro ao limpar aviso: "
-                f"{exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao limpar aviso."
             )
 
     def entendi():
@@ -229,11 +229,9 @@ def iniciar_extensao(comp):
                     notification_id
                 )
 
-            except Exception as exc:
-                print(
-                    "[B2B Telegram] "
-                    "Erro ao marcar notificacao "
-                    f"como lida: {exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao marcar notificacao como lida."
                 )
 
         estado["janela"] = None
@@ -275,8 +273,7 @@ def iniciar_extensao(comp):
 
         limpar_balao()
 
-        print(
-            "[B2B Telegram] "
+        logger.info(
             "Aviso expirou apos 24 horas. "
             "Historico preservado."
         )
@@ -310,10 +307,9 @@ def iniciar_extensao(comp):
             ):
                 comp._expand_compact_for_reminder()
 
-        except Exception as exc:
-            print(
-                "[B2B Telegram] "
-                f"Erro ao mostrar MARVIN: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao mostrar MARVIN."
             )
 
         _beep()
@@ -329,10 +325,9 @@ def iniciar_extensao(comp):
                 2000000000,
             )
 
-        except Exception as exc:
-            print(
-                "[B2B Telegram] "
-                f"Erro no balao: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro no balao."
             )
 
         estado["aviso_ativo"] = True
@@ -345,8 +340,7 @@ def iniciar_extensao(comp):
             )
         )
 
-        print(
-            "[B2B Telegram] "
+        logger.info(
             "Aviso exibido no MARVIN."
         )
 
@@ -390,8 +384,7 @@ def iniciar_extensao(comp):
                 # A mensagem continua no historico,
                 # mas nao deve mais abrir popup.
                 if time.time() >= expira_em:
-                    print(
-                        "[B2B Telegram] "
+                    logger.info(
                         "Aviso pendente expirado. "
                         "Historico preservado."
                     )
@@ -448,11 +441,9 @@ def iniciar_extensao(comp):
                 )
             )
 
-        except Exception as exc:
-            print(
-                "[B2B Telegram] "
-                "Erro ao registrar notificacao: "
-                f"{exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao registrar notificacao."
             )
 
         entrada_thread.put(
@@ -480,8 +471,7 @@ def iniciar_extensao(comp):
 
     monitor.start()
 
-    print(
-        "[B2B Telegram] "
+    logger.info(
         "Extensao iniciada."
     )
 

@@ -1,3 +1,4 @@
+import logging
 import queue
 import sys
 import tkinter as tk
@@ -5,6 +6,11 @@ import tkinter as tk
 from pathlib import Path
 
 from PIL import Image
+
+
+logger = logging.getLogger(
+    "marvin.tray"
+)
 
 
 try:
@@ -129,10 +135,9 @@ class TrayController:
                 try:
                     callback()
 
-                except Exception as exc:
-                    print(
-                        "[MARVIN] Erro em acao "
-                        f"da bandeja: {exc}"
+                except Exception:
+                    logger.exception(
+                        "Erro em acao da bandeja."
                     )
 
         except queue.Empty:
@@ -240,10 +245,9 @@ class TrayController:
 
                 return canvas
 
-            except Exception as exc:
-                print(
-                    "[MARVIN] Erro ao carregar "
-                    f"icone: {exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao carregar icone da bandeja."
                 )
 
 
@@ -262,8 +266,8 @@ class TrayController:
 
 
         if pystray is None:
-            print(
-                "[MARVIN] pystray nao instalado. "
+            logger.warning(
+                "pystray nao instalado. "
                 "Bandeja desativada."
             )
 
@@ -277,8 +281,8 @@ class TrayController:
         imagem = self._image()
 
         if imagem is None:
-            print(
-                "[MARVIN] Nao foi possivel criar "
+            logger.warning(
+                "Nao foi possivel criar "
                 "o icone da bandeja."
             )
 
@@ -358,8 +362,8 @@ class TrayController:
         self._icon.run_detached()
 
 
-        print(
-            "[MARVIN] Icone da bandeja iniciado."
+        logger.info(
+            "Icone da bandeja iniciado."
         )
 
 

@@ -1,6 +1,13 @@
+import logging
+
 from pathlib import Path
 
 from PIL import Image, ImageTk
+
+
+logger = logging.getLogger(
+    "marvin.sprites"
+)
 
 
 class SpriteLoader:
@@ -108,10 +115,10 @@ class SpriteLoader:
                     or f"Sprite {label}"
                 )
 
-                print(
-                    "[MARVIN] "
-                    f"{descricao} nao encontrado: "
-                    f"{arquivo}"
+                logger.warning(
+                    "%s nao encontrado: %s",
+                    descricao,
+                    arquivo,
                 )
 
                 continue
@@ -146,10 +153,10 @@ class SpriteLoader:
             )
 
 
-        print(
-            "[MARVIN] "
-            f"{len(frames)} frame(s) "
-            f"{label} carregado(s)."
+        logger.info(
+            "%s frame(s) %s carregado(s).",
+            len(frames),
+            label,
         )
 
 
@@ -228,9 +235,9 @@ class SpriteLoader:
 
 
         if not arquivo.exists():
-            print(
-                "[MARVIN] Sprite happy "
-                f"nao encontrado: {arquivo}"
+            logger.warning(
+                "Sprite happy nao encontrado: %s",
+                arquivo,
             )
 
             return None
@@ -263,8 +270,8 @@ class SpriteLoader:
         )
 
 
-        print(
-            "[MARVIN] frame happy carregado."
+        logger.info(
+            "Frame happy carregado."
         )
 
 
@@ -295,9 +302,9 @@ class SpriteLoader:
         for arquivo in arquivos:
 
             if not arquivo.exists():
-                print(
-                    "[MARVIN] Sprite compact "
-                    f"nao encontrado: {arquivo}"
+                logger.warning(
+                    "Sprite compact nao encontrado: %s",
+                    arquivo,
                 )
 
                 continue
@@ -438,10 +445,9 @@ class SpriteLoader:
             )
 
 
-        print(
-            "[MARVIN] "
-            f"{len(frames)} frame(s) "
-            "compact carregado(s)."
+        logger.info(
+            "%s frame(s) compact carregado(s).",
+            len(frames),
         )
 
 

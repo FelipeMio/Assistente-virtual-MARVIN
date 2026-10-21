@@ -1,5 +1,11 @@
 import datetime
+import logging
 import random
+
+
+logger = logging.getLogger(
+    "marvin.routine"
+)
 
 
 class RoutineController:
@@ -216,10 +222,9 @@ class RoutineController:
                 self._list_tasks()
             )
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro ao gerar "
-                f"resumo: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao gerar resumo diario."
             )
 
             return

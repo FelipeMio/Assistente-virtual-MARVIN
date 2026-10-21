@@ -1,10 +1,16 @@
 import copy
 import json
+import logging
 import threading
 
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
+
+
+logger = logging.getLogger(
+    "marvin.notifications"
+)
 
 
 DEFAULT_HISTORY_LIMIT = 200
@@ -56,10 +62,10 @@ class NotificationManager:
                 and item.get("id")
             ][:self.history_limit]
 
-        except Exception as exc:
-            print(
-                "[MARVIN Notifications] "
-                f"Erro ao carregar historico: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao carregar historico "
+                "de notificacoes."
             )
 
     def _save_locked(self):
@@ -90,10 +96,10 @@ class NotificationManager:
                 self.storage_file
             )
 
-        except Exception as exc:
-            print(
-                "[MARVIN Notifications] "
-                f"Erro ao salvar historico: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao salvar historico "
+                "de notificacoes."
             )
 
     def adicionar(

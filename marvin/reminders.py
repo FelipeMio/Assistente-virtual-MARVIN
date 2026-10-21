@@ -1,6 +1,12 @@
 import datetime
+import logging
 import threading
 import tkinter as tk
+
+
+logger = logging.getLogger(
+    "marvin.reminders"
+)
 
 
 class ReminderQueue:
@@ -184,10 +190,9 @@ class ReminderService:
                     apenas_pendentes=True
                 )
 
-            except Exception as exc:
-                print(
-                    "[MARVIN] Erro ao listar "
-                    f"lembretes: {exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao listar lembretes."
                 )
 
                 continue

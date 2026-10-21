@@ -1,5 +1,11 @@
+import logging
 import threading
 import tkinter as tk
+
+
+logger = logging.getLogger(
+    "marvin.lifecycle"
+)
 
 
 class LifecycleController:
@@ -122,10 +128,9 @@ class LifecycleController:
                 )
             )
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro ao carregar "
-                f"extensoes: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao carregar extensoes."
             )
 
             loaded = []
@@ -168,10 +173,9 @@ class LifecycleController:
         try:
             self._cleanup_database()
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro na limpeza "
-                f"do banco: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro na limpeza do banco."
             )
 
 
@@ -184,10 +188,9 @@ class LifecycleController:
         try:
             self._start_day()
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro na rotina "
-                f"inicial: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro na rotina inicial."
             )
 
 
@@ -262,12 +265,10 @@ class LifecycleController:
             try:
                 stop()
 
-            except Exception as exc:
-                print(
-                    "[MARVIN] Erro ao encerrar "
-                    "extensao "
-                    f"{type(extension).__name__}: "
-                    f"{exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao encerrar extensao %s.",
+                    type(extension).__name__,
                 )
 
 
@@ -300,10 +301,10 @@ class LifecycleController:
         try:
             callback()
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro ao encerrar "
-                f"{name}: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao encerrar %s.",
+                name,
             )
 
 
@@ -324,8 +325,8 @@ class LifecycleController:
         try:
             stop()
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro ao encerrar "
-                f"{name}: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao encerrar %s.",
+                name,
             )

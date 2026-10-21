@@ -1,7 +1,13 @@
 ﻿import json
+import logging
 import threading
 import urllib.parse
 import urllib.request
+
+
+logger = logging.getLogger(
+    "marvin.extensions.b2b_telegram.monitor"
+)
 
 
 class B2BTelegramMonitor:
@@ -126,16 +132,13 @@ class B2BTelegramMonitor:
         try:
             self._definir_ponto_inicial()
 
-            print(
-                "[B2B Telegram] "
+            logger.info(
                 "Monitor conectado."
             )
 
-        except Exception as exc:
-            print(
-                "[B2B Telegram] "
-                "Falha ao iniciar: "
-                f"{exc}"
+        except Exception:
+            logger.exception(
+                "Falha ao iniciar monitor."
             )
 
             self._offset = None
@@ -152,10 +155,9 @@ class B2BTelegramMonitor:
                 if self._stop_event.is_set():
                     break
 
-                print(
-                    "[B2B Telegram] "
-                    "Erro ao consultar Telegram: "
-                    f"{exc}"
+                logger.warning(
+                    "Erro ao consultar Telegram: %s",
+                    exc,
                 )
 
                 self._stop_event.wait(5)
@@ -177,19 +179,16 @@ class B2BTelegramMonitor:
                     if texto is None:
                         continue
 
-                    print(
-                        "[B2B Telegram] "
+                    logger.info(
                         "Aviso valido recebido."
                     )
 
                     if self.on_message:
                         self.on_message(texto)
 
-                except Exception as exc:
-                    print(
-                        "[B2B Telegram] "
-                        "Erro ao processar update: "
-                        f"{exc}"
+                except Exception:
+                    logger.exception(
+                        "Erro ao processar update."
                     )
 
     def start(self):

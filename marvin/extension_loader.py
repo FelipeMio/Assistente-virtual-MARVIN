@@ -1,6 +1,12 @@
 import importlib.util
+import logging
 import sys
 from pathlib import Path
+
+
+logger = logging.getLogger(
+    "marvin.extensions"
+)
 
 
 def carregar_extensoes(companion):
@@ -61,9 +67,10 @@ def carregar_extensoes(companion):
             )
 
             if not callable(iniciar):
-                print(
-                    f"[MARVIN] Extensao '{pasta.name}' "
-                    "nao possui iniciar_extensao()."
+                logger.warning(
+                    "Extensao '%s' nao possui "
+                    "iniciar_extensao().",
+                    pasta.name,
                 )
                 continue
 
@@ -78,15 +85,15 @@ def carregar_extensoes(companion):
                 else:
                     carregadas.append(objetos)
 
-            print(
-                f"[MARVIN] Extensao carregada: "
-                f"{pasta.name}"
+            logger.info(
+                "Extensao carregada: %s",
+                pasta.name,
             )
 
-        except Exception as exc:
-            print(
-                f"[MARVIN] Erro na extensao "
-                f"'{pasta.name}': {exc}"
+        except Exception:
+            logger.exception(
+                "Erro na extensao '%s'.",
+                pasta.name,
             )
 
     return carregadas

@@ -1,3 +1,4 @@
+import logging
 import tkinter as tk
 import customtkinter as ctk
 import time, datetime, sys, os
@@ -31,6 +32,7 @@ if sys.platform == "win32":
 
 from .config import load_cfg, save_cfg
 from .theme import get_palette, get_modern_palette
+from .logging_config import configure_logging
 
 from .notifications import NotificationManager
 from .extension_loader import carregar_extensoes
@@ -74,6 +76,13 @@ from marvin.database import (
 
 
 # CONFIGURAÇÃO
+
+configure_logging()
+
+logger = logging.getLogger(
+    "marvin.main"
+)
+
 
 cfg = load_cfg()
 
@@ -184,9 +193,9 @@ def _set_startup_enabled(enabled):
 
         return True
 
-    except Exception as exc:
-        print(
-            f"[MARVIN] Erro ao configurar inicio com Windows: {exc}"
+    except Exception:
+        logger.exception(
+            "Erro ao configurar inicio com Windows."
         )
         return False
 

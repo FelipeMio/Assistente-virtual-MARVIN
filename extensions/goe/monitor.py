@@ -1,9 +1,15 @@
 import csv
 import datetime
+import logging
 import os
 from pathlib import Path
 
 from .history import registrar_leitura
+
+
+logger = logging.getLogger(
+    "marvin.extensions.goe.monitor"
+)
 
 
 # Horas que realmente possuem dados do monitoramento.
@@ -298,9 +304,9 @@ class GOEMonitor:
                 if comando == "parado":
                     status_teste["qtde"] = 0
 
-                    print(
-                        f"[GOE TESTE] "
-                        f"{referencia.hour:02d}h -> PARADO"
+                    logger.info(
+                        "GOE TESTE %02dh -> PARADO",
+                        referencia.hour,
                     )
 
                     self._em_alerta = True
@@ -309,9 +315,9 @@ class GOEMonitor:
                 elif comando == "normal":
                     status_teste["qtde"] = 123456
 
-                    print(
-                        f"[GOE TESTE] "
-                        f"{referencia.hour:02d}h -> VOLTOU"
+                    logger.info(
+                        "GOE TESTE %02dh -> VOLTOU",
+                        referencia.hour,
                     )
 
                     self._em_alerta = False
@@ -320,18 +326,18 @@ class GOEMonitor:
                 elif comando == "ok":
                     status_teste["qtde"] = 123456
 
-                    print(
-                        f"[GOE TESTE] "
-                        f"{referencia.hour:02d}h -> OK"
+                    logger.info(
+                        "GOE TESTE %02dh -> OK",
+                        referencia.hour,
                     )
 
                     if self.on_ok is not None:
                         self.on_ok(status_teste)
 
                 else:
-                    print(
-                        f"[GOE TESTE] "
-                        f"comando desconhecido: {comando}"
+                    logger.warning(
+                        "GOE TESTE comando desconhecido: %s",
+                        comando,
                     )
 
                 self._agendar()
@@ -391,9 +397,9 @@ class GOEMonitor:
             )
 
             if not status.get("ok"):
-                print(
-                    "[GOE] CSV invalido:",
-                    status
+                logger.warning(
+                    "CSV invalido: %s",
+                    status,
                 )
 
                 self._agendar()
@@ -422,10 +428,9 @@ class GOEMonitor:
                         exigir_atual=False,
                     )
 
-            except Exception as exc:
-                print(
-                    "[GOE] Erro ao salvar "
-                    f"historico: {exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao salvar historico."
                 )
 
             # -------------------------------------------------
@@ -466,16 +471,16 @@ class GOEMonitor:
                 )
 
                 if parcial is not None:
-                    print(
-                        "[GOE] Parcial registrado: "
-                        f"{parcial.get('hora', 0):02d}h "
-                        f"-> {parcial.get('qtde', 0)} registros"
+                    logger.info(
+                        "Parcial registrado: %02dh -> %s registros",
+                        parcial.get("hora", 0),
+                        parcial.get("qtde", 0),
                     )
 
                 else:
-                    print(
-                        "[GOE] Leitura historica registrada: "
-                        f"{status.get('hora', 0):02d}h"
+                    logger.info(
+                        "Leitura historica registrada: %02dh",
+                        status.get("hora", 0),
                     )
 
                 self._agendar()
@@ -483,9 +488,10 @@ class GOEMonitor:
 
             qtde = status["qtde"]
 
-            print(
-                f"[GOE] {status['hora']:02d}h "
-                f"-> {qtde} registros"
+            logger.info(
+                "%02dh -> %s registros",
+                status["hora"],
+                qtde,
             )
 
             # -----------------------------------------
@@ -519,9 +525,9 @@ class GOEMonitor:
                         status
                     )
 
-        except Exception as exc:
-            print(
-                f"[GOE] Erro no monitor: {exc}"
+        except Exception:
+            logger.exception(
+                "Erro no monitor."
             )
 
         self._agendar()

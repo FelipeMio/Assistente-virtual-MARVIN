@@ -1,10 +1,16 @@
 import json
+import logging
 import sys
 import tkinter as tk
 from pathlib import Path
 
 from .monitor import GOEMonitor
 from .dashboard import abrir_dashboard
+
+
+logger = logging.getLogger(
+    "marvin.extensions.goe"
+)
 
 
 EXTENSION_DIR = Path(__file__).resolve().parent
@@ -22,9 +28,9 @@ def _carregar_config():
         ) as f:
             return json.load(f)
 
-    except Exception as exc:
-        print(
-            f"[GOE] Erro ao ler config.json: {exc}"
+    except Exception:
+        logger.exception(
+            "Erro ao ler config.json."
         )
         return None
 
@@ -222,8 +228,8 @@ def iniciar_extensao(comp):
     # Sem config.json:
     # extensao instalada, mas desligada.
     if not config:
-        print(
-            "[GOE] Extensao instalada, "
+        logger.info(
+            "Extensao instalada, "
             "mas nao configurada."
         )
         return []
@@ -232,8 +238,8 @@ def iniciar_extensao(comp):
         "enabled",
         False,
     ):
-        print(
-            "[GOE] Monitor desativado."
+        logger.info(
+            "Monitor desativado."
         )
         return []
 
@@ -421,8 +427,8 @@ def iniciar_extensao(comp):
         comp,
     )
 
-    print(
-        "[GOE] Monitor iniciado."
+    logger.info(
+        "Monitor iniciado."
     )
 
     return [monitor]

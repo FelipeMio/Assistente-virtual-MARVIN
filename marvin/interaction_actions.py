@@ -1,5 +1,11 @@
 import datetime
+import logging
 import time
+
+
+logger = logging.getLogger(
+    "marvin.interaction"
+)
 
 
 class InteractionActionController:
@@ -233,12 +239,11 @@ class InteractionActionController:
                 )
             )
 
-        except Exception as exc:
+        except Exception:
             self._panel_open = False
 
-            print(
-                "[MARVIN] Erro ao abrir "
-                f"InteractionPanel: {exc}"
+            logger.exception(
+                "Erro ao abrir InteractionPanel."
             )
 
             return

@@ -1,5 +1,11 @@
+import logging
 import sys
 import tkinter as tk
+
+
+logger = logging.getLogger(
+    "marvin.compact_mode"
+)
 
 
 ctypes = None
@@ -92,10 +98,9 @@ class CompactModeController:
 
             return root_hwnd or hwnd
 
-        except Exception as exc:
-            print(
-                "[MARVIN] Erro ao obter HWND: "
-                f"{exc}"
+        except Exception:
+            logger.exception(
+                "Erro ao obter HWND."
             )
             return None
 
@@ -179,10 +184,9 @@ class CompactModeController:
                         info.rcWork.bottom,
                     )
 
-            except Exception as exc:
-                print(
-                    "[MARVIN] Erro ao detectar "
-                    f"monitor: {exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao detectar monitor."
                 )
 
         return (
@@ -270,10 +274,9 @@ class CompactModeController:
                 if ok:
                     return True
 
-            except Exception as exc:
-                print(
-                    "[MARVIN] Erro ao mover "
-                    f"janela: {exc}"
+            except Exception:
+                logger.exception(
+                    "Erro ao mover janela."
                 )
 
         return False
