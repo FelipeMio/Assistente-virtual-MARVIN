@@ -5,7 +5,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-from .branding import marvin_icon
+from .branding import marvin_icon, round_window
 
 from pathlib import Path
 from tkinter import messagebox
@@ -123,9 +123,7 @@ class InteractionPanel:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self.shell = ctk.CTkFrame(
             self.win,
@@ -724,17 +722,17 @@ class InteractionPanel:
 
         if n == 0:
             mensagem = (
-                "Nenhuma tarefa pendente."
+                "Nenhuma tarefa pendente"
             )
 
         elif n == 1:
             mensagem = (
-                "1 tarefa pendente."
+                "1 tarefa pendente"
             )
 
         else:
             mensagem = (
-                f"{n} tarefas pendentes."
+                f"{n} tarefas pendentes"
             )
 
 
@@ -749,7 +747,8 @@ class InteractionPanel:
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=11,
+                size=12,
+                weight="bold",
             ),
 
         ).pack()
@@ -770,17 +769,22 @@ class InteractionPanel:
 
 
         hoje_texto = (
-            "1 para hoje."
+            "1 para hoje"
             if n_hoje == 1
             else
-            f"{n_hoje} para hoje."
+            f"{n_hoje} para hoje"
         )
 
 
         ctk.CTkLabel(
             stats,
 
-            text=hoje_texto,
+            text=f"  {hoje_texto}  ",
+
+            height=20,
+            corner_radius=6,
+
+            fg_color=self.colors["surface"],
 
             text_color=self.colors[
                 "dim"
@@ -788,7 +792,7 @@ class InteractionPanel:
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
 
         ).pack(
@@ -809,7 +813,12 @@ class InteractionPanel:
             ctk.CTkLabel(
                 stats,
 
-                text=streak_texto,
+                text=f"  {streak_texto}  ",
+
+                height=20,
+                corner_radius=6,
+
+                fg_color=self.colors["green_bg"],
 
                 text_color=self.colors[
                     "green"
@@ -817,12 +826,12 @@ class InteractionPanel:
 
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=8,
+                    size=9,
                 ),
 
             ).pack(
                 side="left",
-                padx=(12, 0),
+                padx=(6, 0),
             )
 
 
@@ -1186,7 +1195,7 @@ class InteractionPanel:
 
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=8,
+                    size=9,
                 ),
 
             ).pack(

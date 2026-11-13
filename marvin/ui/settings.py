@@ -4,7 +4,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-from .branding import title_icon
+from .branding import round_window, title_icon
 
 from pathlib import Path
 from tkinter import messagebox
@@ -74,9 +74,7 @@ class SettingsWindow:
             f"{self.WIDTH}x{self.HEIGHT}"
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self.win.transient(parent)
 
@@ -1357,7 +1355,7 @@ class SettingsWindow:
             text_color=self.colors["dim"],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
         ).pack(
             fill="x",

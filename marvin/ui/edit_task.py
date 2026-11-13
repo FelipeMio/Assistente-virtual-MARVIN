@@ -3,7 +3,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-from .branding import title_icon
+from .branding import round_window, title_icon
 
 from tkinter import messagebox
 
@@ -125,9 +125,7 @@ class EditTaskWindow:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self.win.transient(
             parent

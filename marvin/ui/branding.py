@@ -1,5 +1,7 @@
 """Elementos visuais compartilhados pelas janelas do MARVIN."""
 
+import sys
+import tkinter as tk
 from pathlib import Path
 
 import customtkinter as ctk
@@ -126,4 +128,45 @@ def close_button(parent, colors, command, *, hover=None):
         command=command,
     )
     button.pack(side="right", padx=10)
+    return button
+
+
+def _transparent_key(color):
+    """Cor quase igual ao fundo, usada so como 'chave' de transparencia."""
+    r = int(color[1:3], 16)
+    g = int(color[3:5], 16)
+    b = int(color[5:7], 16)
+    b = b + 1 if b < 255 else b - 1
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def round_window(win, colors, key="bg"):
+    """
+    Deixa os cantos da janela realmente arredondados.
+
+    O fundo da propria janela vira uma cor-chave transparente, e so o
+    painel interno (com corner_radius) aparece. Fora do Windows, apenas
+    pinta o fundo normalmente.
+    """
+    fundo = colors[key]
+
+    if sys.platform != "win32":
+        win.configure(fg_color=fundo)
+        return
+
+    chave = _transparent_key(fundo)
+
+    try:
+        win.configure(fg_color=chave)
+        win.attributes("-transparentcolor", chave)
+
+    except tk.TclError:
+        win.configure(fg_color=fundo)
+
+
+def hover_text(button, normal, hover):
+    """Troca a cor do texto de um botao quando o mouse passa por cima."""
+    button.configure(text_color=normal)
+    button.bind("<Enter>", lambda e: button.configure(text_color=hover), add="+")
+    button.bind("<Leave>", lambda e: button.configure(text_color=normal), add="+")
     return button

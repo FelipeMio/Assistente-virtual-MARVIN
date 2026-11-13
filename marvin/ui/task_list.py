@@ -3,7 +3,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-from .branding import title_icon
+from .branding import hover_text, round_window, title_icon
 
 from tkinter import messagebox
 
@@ -105,9 +105,7 @@ class TaskWindow:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self._drag_x = 0
         self._drag_y = 0
@@ -1297,7 +1295,7 @@ class TaskWindow:
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
                 weight="bold",
             ),
 
@@ -1331,7 +1329,7 @@ class TaskWindow:
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
 
         ).pack(
@@ -1349,29 +1347,35 @@ class TaskWindow:
             fg_color="transparent",
         )
 
+        # Empacota antes do texto para nao ser espremido
+        # e ficar por cima da borda direita do card.
         actions.pack(
             side="right",
             anchor="n",
+            padx=(0, 8),
             pady=6,
+            before=center,
         )
 
 
-        ctk.CTkButton(
+        edit_btn = ctk.CTkButton(
             actions,
 
             text="Editar",
 
-            width=62,
-            height=30,
+            width=52,
+            height=26,
+
+            corner_radius=6,
 
             fg_color="transparent",
             hover_color=self.colors["hover"],
 
-            text_color=self.colors["accent"],
+            text_color=self.colors["dim"],
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
 
             command=lambda i=tid:
@@ -1381,33 +1385,51 @@ class TaskWindow:
                     i,
                     self._refresh
                 ),
-        ).pack(
+        )
+
+        edit_btn.pack(
             side="left"
         )
 
+        hover_text(
+            edit_btn,
+            self.colors["dim"],
+            self.colors["text"],
+        )
 
-        ctk.CTkButton(
+
+        del_btn = ctk.CTkButton(
             actions,
 
             text="Excluir",
 
-            width=62,
-            height=30,
+            width=52,
+            height=26,
+
+            corner_radius=6,
 
             fg_color="transparent",
             hover_color=self.colors["hover"],
 
-            text_color=self.colors["red"],
+            text_color=self.colors["dim"],
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
 
             command=lambda i=tid:
                 self._delete(i),
-        ).pack(
+        )
+
+        del_btn.pack(
             side="left"
+        )
+
+        hover_text(
+            del_btn,
+            self.colors["dim"],
+            self.colors["red"],
         )
 
 

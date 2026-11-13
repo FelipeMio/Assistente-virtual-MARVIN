@@ -8,7 +8,13 @@ import customtkinter as ctk
 from .config import load_cfg
 from .database import DB_F
 from .theme import get_modern_palette
-from .ui.branding import close_button, title_icon, title_text
+from .ui.branding import (
+    close_button,
+    hover_text,
+    round_window,
+    title_icon,
+    title_text,
+)
 from .ui.window_position import position_near
 
 
@@ -244,7 +250,7 @@ class _JanelaBase:
         self.win = ctk.CTkToplevel(parent)
         self.win.geometry(f"{largura}x{altura}")
         self.win.overrideredirect(True)
-        self.win.configure(fg_color=self.c["bg"])
+        round_window(self.win, self.c)
         self.win.bind("<Escape>", lambda e: self.fechar())
 
         self._drag = (0, 0)
@@ -624,7 +630,7 @@ class ChecklistWindow(_JanelaBase):
             ),
         ).pack(side="left", fill="x", expand=True)
 
-        ctk.CTkButton(
+        excluir = ctk.CTkButton(
             card,
             text="Excluir",
             width=50,
@@ -632,10 +638,11 @@ class ChecklistWindow(_JanelaBase):
             corner_radius=6,
             fg_color="transparent",
             hover_color=self.c["hover"],
-            text_color=self.c["red"],
             font=_fonte(9),
             command=lambda i=item: self.excluir(i),
-        ).pack(side="right", padx=(0, 8))
+        )
+        excluir.pack(side="right", padx=(0, 8))
+        hover_text(excluir, self.c["dim"], self.c["red"])
 
         ctk.CTkLabel(
             card,
@@ -644,7 +651,7 @@ class ChecklistWindow(_JanelaBase):
             corner_radius=6,
             fg_color=self.c["surface"],
             text_color=self.c["dim"],
-            font=_fonte(8, "bold"),
+            font=_fonte(9, "bold"),
         ).pack(side="right", padx=(6, 4))
 
     def atualizar_progresso(self, itens):

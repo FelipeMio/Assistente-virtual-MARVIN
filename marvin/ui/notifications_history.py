@@ -2,7 +2,7 @@ from datetime import datetime
 
 import customtkinter as ctk
 
-from .branding import title_icon
+from .branding import round_window, title_icon
 
 from marvin.config import load_cfg
 from marvin.theme import get_modern_palette
@@ -68,9 +68,7 @@ class NotificationHistoryWindow:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self._build()
         self.refresh()
@@ -957,7 +955,7 @@ class NotificationHistoryWindow:
                 ],
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=8,
+                    size=9,
                     weight="bold",
                 ),
             ).pack(
@@ -1038,7 +1036,7 @@ class NotificationHistoryWindow:
             ],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
         ).pack(
             side="left",
@@ -1071,7 +1069,7 @@ class NotificationHistoryWindow:
                 ],
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=8,
+                    size=9,
                 ),
                 command=(
                     lambda nid=notification_id:

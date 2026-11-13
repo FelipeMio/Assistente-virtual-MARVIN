@@ -2,7 +2,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 
-from .branding import marvin_icon, title_icon
+from .branding import marvin_icon, round_window, title_icon
 from PIL import Image
 
 from marvin.config import load_cfg
@@ -79,9 +79,7 @@ class HomeWindow:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self._drag_x = 0
         self._drag_y = 0

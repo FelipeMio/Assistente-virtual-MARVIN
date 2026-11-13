@@ -4,6 +4,8 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import round_window
+
 from ..config import load_cfg
 from ..database import db_adiar
 from ..theme import get_modern_palette
@@ -119,9 +121,7 @@ class SnoozeWindow:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self._build()
 
@@ -241,7 +241,7 @@ class SnoozeWindow:
             text_color=self.colors["dim"],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
         ).pack(
             fill="x"
@@ -310,7 +310,7 @@ class SnoozeWindow:
                 text_color=self.colors["dim"],
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=8,
+                    size=9,
                 ),
             ).pack(
                 fill="x",
@@ -553,11 +553,7 @@ class SnoozeWindow:
             True,
         )
 
-        win.configure(
-            fg_color=self.colors[
-                "bg"
-            ]
-        )
+        round_window(win, self.colors)
 
         shell = ctk.CTkFrame(
             win,
@@ -646,7 +642,7 @@ class SnoozeWindow:
 
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=8,
+                size=9,
             ),
 
         ).pack(
@@ -862,7 +858,7 @@ class SnoozeWindow:
 
                 font=ctk.CTkFont(
                     family="Segoe UI",
-                    size=8,
+                    size=9,
                 ),
             )
         )

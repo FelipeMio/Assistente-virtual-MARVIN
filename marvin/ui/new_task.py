@@ -3,7 +3,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-from .branding import title_icon, title_text
+from .branding import round_window, title_icon, title_text
 
 
 class NewTaskWindow:
@@ -89,9 +89,7 @@ class NewTaskWindow:
             True
         )
 
-        self.win.configure(
-            fg_color=self.colors["bg"]
-        )
+        round_window(self.win, self.colors)
 
         self.win.grab_set()
 
