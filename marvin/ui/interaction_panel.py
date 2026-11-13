@@ -420,14 +420,14 @@ class InteractionPanel:
         )
 
         try:
-            self.header_marvin_image = marvin_icon(30)
+            self.header_marvin_image = marvin_icon(22)
 
             ctk.CTkLabel(
                 header,
                 text="",
                 image=self.header_marvin_image,
-                width=30,
-                height=30,
+                width=22,
+                height=22,
             ).pack(
                 side="left",
                 padx=(12, 0),

@@ -546,7 +546,7 @@ class HomeWindow:
         )
 
         try:
-            self.marvin_head_image = marvin_icon(45)
+            self.marvin_head_image = marvin_icon(36)
 
             avatar = ctk.CTkLabel(
                 header,

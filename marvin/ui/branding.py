@@ -31,7 +31,16 @@ def marvin_icon(size=20):
     if bbox:
         imagem = imagem.crop(bbox)
 
-    imagem = imagem.resize((size, size), Image.NEAREST)
+    # O recorte nao e quadrado: centraliza num quadrado transparente
+    # para nao esticar o personagem ao redimensionar.
+    lado = max(imagem.size)
+    quadrado = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    quadrado.paste(
+        imagem,
+        ((lado - imagem.width) // 2, (lado - imagem.height) // 2),
+    )
+
+    imagem = quadrado.resize((size, size), Image.NEAREST)
 
     icon = ctk.CTkImage(
         light_image=imagem,
