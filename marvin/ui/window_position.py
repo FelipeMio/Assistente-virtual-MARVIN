@@ -7,6 +7,7 @@ def position_near(
     anchor_width=None,
     anchor_height=None,
     gap=12,
+    margin=8,
 ):
     """
     Posiciona uma janela ao lado do MARVIN,
@@ -18,6 +19,12 @@ def position_near(
 
     ww = window.winfo_width()
     wh = window.winfo_height()
+
+    # Janela ainda escondida (withdraw): o Tk informa 1x1.
+    # Usa o tamanho que ela vai pedir ao aparecer.
+    if not window.winfo_ismapped():
+        ww = max(ww, window.winfo_reqwidth())
+        wh = max(wh, window.winfo_reqheight())
 
     rx = anchor.winfo_x()
     ry = anchor.winfo_y()
@@ -77,6 +84,13 @@ def position_near(
 
         except Exception:
             pass
+
+    # Folga para a janela nao ficar colada na borda
+    # da tela nem na barra de tarefas.
+    mon_left += margin
+    mon_top += margin
+    mon_right -= margin
+    mon_bottom -= margin
 
     # Prefere abrir do lado esquerdo
     if rx - ww - gap >= mon_left:

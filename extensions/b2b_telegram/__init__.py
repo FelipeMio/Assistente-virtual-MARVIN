@@ -283,6 +283,7 @@ def iniciar_extensao(comp):
         mensagem,
         notification_id=None,
         expira_em=None,
+        restantes=0,
     ):
         if expira_em is None:
             expira_em = (
@@ -337,6 +338,7 @@ def iniciar_extensao(comp):
                 comp,
                 mensagem,
                 entendi,
+                restantes=restantes,
             )
         )
 
@@ -396,6 +398,7 @@ def iniciar_extensao(comp):
                     mensagem,
                     notification_id,
                     expira_em,
+                    restantes=len(pendentes),
                 )
 
                 break

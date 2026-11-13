@@ -1,11 +1,41 @@
 import math
-import textwrap
+import tkinter.font as tkfont
+
+
+FONT_FAMILY = "Segoe UI"
+
+PAD_X = 12
+PAD_Y = 9
+RADIUS = 10
+TAIL_HALF = 6
+GAP = 16          # distancia entre o balao e a cabeca do MARVIN
+MAX_LINES = 4
+MIN_WIDTH = 70
+
+PILL_H = 24
+PILL_GAP = 6
+
+ALERT_BUTTONS = (
+    ("complete", "✓ Concluir", 70),
+    ("snooze", "Adiar", 58),
+)
+
+SNOOZE_OPTIONS = (
+    ("5", "5m"),
+    ("15", "15m"),
+    ("30", "30m"),
+    ("60", "1h"),
+)
+SNOOZE_PILL_W = 31
 
 
 class BubbleRenderer:
     """
     Desenha o balao do MARVIN e calcula
     a geometria dos botoes interativos.
+
+    O mesmo layout e usado para desenhar e para o
+    hit test dos cliques, entao os dois nunca divergem.
     """
 
     def __init__(
@@ -26,6 +56,78 @@ class BubbleRenderer:
             normal_size[1]
         )
 
+        self._fonts = {}
+
+    # ========================================================
+    # FONTES
+    # ========================================================
+
+    def _font(self, size, weight="normal"):
+        key = (size, weight)
+
+        if key not in self._fonts:
+            self._fonts[key] = tkfont.Font(
+                root=self.canvas,
+                family=FONT_FAMILY,
+                size=size,
+                weight=weight,
+            )
+
+        return self._fonts[key]
+
+    def _text_font(self, mode):
+        # Lembretes ganham destaque em negrito.
+        return self._font(
+            9,
+            "bold" if mode == "alert" else "normal",
+        )
+
+    # ========================================================
+    # TEXTO
+    # ========================================================
+
+    @staticmethod
+    def _wrap(text, font, max_width):
+        """Quebra o texto pela largura real em pixels."""
+        lines = []
+
+        for paragraph in str(text).split("\n"):
+            words = paragraph.split()
+
+            if not words:
+                continue
+
+            current = words[0]
+
+            for word in words[1:]:
+                candidate = f"{current} {word}"
+
+                if font.measure(candidate) <= max_width:
+                    current = candidate
+                else:
+                    lines.append(current)
+                    current = word
+
+            lines.append(current)
+
+        if len(lines) > MAX_LINES:
+            lines = lines[:MAX_LINES]
+            last = lines[-1]
+
+            while last and font.measure(last + "…") > max_width:
+                last = last[:-1]
+
+            lines[-1] = last.rstrip() + "…"
+
+        # Palavras enormes (nomes de arquivo) sao cortadas.
+        result = []
+
+        for line in lines:
+            while line and font.measure(line) > max_width:
+                line = line[:-2] + "…"
+            result.append(line)
+
+        return result
 
     # ========================================================
     # LAYOUT
@@ -38,126 +140,184 @@ class BubbleRenderer:
         top_y,
         mode="normal",
     ):
-        wrapped = textwrap.wrap(
-            text,
-            width=26,
-        )[:4]
+        font = self._text_font(mode)
 
+        max_bubble_w = max(MIN_WIDTH, self.width - 12)
+        max_text_w = max_bubble_w - 2 * PAD_X
+
+        wrapped = self._wrap(text, font, max_text_w)
 
         if not wrapped:
             return None
 
+        line_h = font.metrics("linespace") + 1
 
-        line_h = 15
-        padding_y = 9
-
+        text_w = max(font.measure(line) for line in wrapped)
 
         if mode == "alert":
-            button_h = 34
+            buttons_w = (
+                sum(w for _, _, w in ALERT_BUTTONS)
+                + PILL_GAP * (len(ALERT_BUTTONS) - 1)
+            )
+            buttons_h = PILL_H + 10
 
         elif mode == "snooze":
-            button_h = 54
+            buttons_w = (
+                SNOOZE_PILL_W * len(SNOOZE_OPTIONS)
+                + PILL_GAP * (len(SNOOZE_OPTIONS) - 1)
+            )
+            buttons_h = PILL_H + 10 + 18
 
         else:
-            button_h = 0
+            buttons_w = 0
+            buttons_h = 0
 
-
-        bubble_width = max(
-            1,
-            self.width - 12,
+        bubble_width = min(
+            max_bubble_w,
+            max(
+                MIN_WIDTH,
+                text_w + 2 * PAD_X,
+                buttons_w + 2 * PAD_X,
+            ),
         )
-
 
         bubble_height = (
             len(wrapped) * line_h
-            + padding_y * 2
-            + button_h
+            + PAD_Y * 2
+            + buttons_h
         )
 
-
-        bubble_x = max(
-            6,
-            center_x
-            - bubble_width // 2,
+        bubble_x = min(
+            max(6, center_x - bubble_width // 2),
+            self.width - 6 - bubble_width,
         )
-
 
         bubble_y = max(
             6,
             top_y
             - bubble_height
-            - 16,
+            - GAP,
         )
-
 
         layout = {
             "wrapped": wrapped,
             "line_h": line_h,
-            "py": padding_y,
+            "py": PAD_Y,
             "bw": bubble_width,
             "bh": bubble_height,
             "bx": bubble_x,
             "by": bubble_y,
             "button_y": None,
+            "buttons": {},
         }
 
+        if mode not in ("alert", "snooze"):
+            return layout
 
-        if mode in (
-            "alert",
-            "snooze",
-        ):
-            layout["button_y"] = (
-                bubble_y
-                + padding_y
-                + len(wrapped) * line_h
-                + 5
-            )
+        button_y = (
+            bubble_y
+            + PAD_Y
+            + len(wrapped) * line_h
+            + 8
+        )
 
+        layout["button_y"] = button_y
 
         if mode == "alert":
-            layout["complete_x"] = (
-                bubble_x
-                + bubble_width // 3
-            )
+            specs = [(key, label, w) for key, label, w in ALERT_BUTTONS]
+        else:
+            specs = [
+                (key, label, SNOOZE_PILL_W)
+                for key, label in SNOOZE_OPTIONS
+            ]
 
-            layout["snooze_x"] = (
-                bubble_x
-                + (
-                    bubble_width * 2
-                ) // 3
-            )
+        total = (
+            sum(w for _, _, w in specs)
+            + PILL_GAP * (len(specs) - 1)
+        )
 
+        x = bubble_x + (bubble_width - total) / 2
 
-        elif mode == "snooze":
-            spacing = (
-                bubble_width / 4
-            )
-
-            layout["option_x"] = {
-                value: (
-                    bubble_x
-                    + spacing * index
-                    + spacing / 2
-                )
-                for index, value
-                in enumerate(
-                    (
-                        "5",
-                        "15",
-                        "30",
-                        "60",
-                    )
-                )
+        for key, label, w in specs:
+            layout["buttons"][key] = {
+                "label": label,
+                "box": (x, button_y, x + w, button_y + PILL_H),
             }
+            x += w + PILL_GAP
 
-            layout["back_y"] = (
-                layout["button_y"]
-                + 31
-            )
+        if mode == "snooze":
+            back_y = button_y + PILL_H + 13
+            cx = bubble_x + bubble_width / 2
 
+            layout["back_y"] = back_y
+            layout["buttons"]["back"] = {
+                "label": "↩ voltar",
+                "box": (cx - 34, back_y - 9, cx + 34, back_y + 9),
+                "link": True,
+            }
 
         return layout
 
+    # ========================================================
+    # FORMAS
+    # ========================================================
+
+    @staticmethod
+    def _rounded_points(x1, y1, x2, y2, r, tail=None):
+        """
+        Pontos de um retangulo arredondado (smooth=True).
+
+        Pontos duplicados viram cantos/segmentos retos;
+        os cantos simples viram curvas. `tail` = (base_x, tip_y)
+        acrescenta a ponta do balao na borda de baixo.
+        """
+        pts = [
+            x1 + r, y1, x1 + r, y1,
+            x2 - r, y1, x2 - r, y1,
+            x2, y1,
+            x2, y1 + r, x2, y1 + r,
+            x2, y2 - r, x2, y2 - r,
+            x2, y2,
+            x2 - r, y2, x2 - r, y2,
+        ]
+
+        if tail is not None:
+            tx, ty = tail
+            pts += [
+                tx + TAIL_HALF, y2, tx + TAIL_HALF, y2,
+                tx, ty, tx, ty,
+                tx - TAIL_HALF, y2, tx - TAIL_HALF, y2,
+            ]
+
+        pts += [
+            x1 + r, y2, x1 + r, y2,
+            x1, y2,
+            x1, y2 - r, x1, y2 - r,
+            x1, y1 + r, x1, y1 + r,
+            x1, y1,
+        ]
+
+        return pts
+
+    def _pill(self, box, *, fill, outline, text, text_color, font):
+        x1, y1, x2, y2 = box
+        r = (y2 - y1) / 2
+
+        self.canvas.create_polygon(
+            self._rounded_points(x1, y1, x2, y2, r),
+            smooth=True,
+            fill=fill,
+            outline=outline,
+            width=1,
+        )
+
+        self.canvas.create_text(
+            (x1 + x2) / 2,
+            (y1 + y2) / 2,
+            text=text,
+            fill=text_color,
+            font=font,
+        )
 
     # ========================================================
     # DRAW
@@ -175,7 +335,6 @@ class BubbleRenderer:
             self.width // 2
         )
 
-
         layout = self.layout(
             text,
             center_x,
@@ -183,154 +342,57 @@ class BubbleRenderer:
             mode,
         )
 
-
         if layout is None:
             return
 
-
         colors = self.palette
 
-        wrapped = layout[
-            "wrapped"
-        ]
+        bx = layout["bx"]
+        by = layout["by"]
+        bw = layout["bw"]
+        bh = layout["bh"]
 
-        line_h = layout[
-            "line_h"
-        ]
-
-        padding_y = layout[
-            "py"
-        ]
-
-        bubble_width = layout[
-            "bw"
-        ]
-
-        bubble_height = layout[
-            "bh"
-        ]
-
-        bubble_x = layout[
-            "bx"
-        ]
-
-        bubble_y = layout[
-            "by"
-        ]
-
-
-        # Shadow.
-        self.canvas.create_rectangle(
-            bubble_x + 2,
-            bubble_y + 2,
-            bubble_x + bubble_width + 2,
-            bubble_y + bubble_height + 2,
-            fill="#060c14",
-            outline="",
+        tip_x = min(
+            max(center_x, bx + RADIUS + TAIL_HALF + 2),
+            bx + bw - RADIUS - TAIL_HALF - 2,
         )
 
-
-        # Bubble body.
-        self.canvas.create_rectangle(
-            bubble_x,
-            bubble_y,
-            bubble_x + bubble_width,
-            bubble_y + bubble_height,
-            fill=colors["bub_bg"],
-            outline=colors["bub_bd"],
-            width=2,
-        )
-
-
-        # Bubble tip.
-        tip = min(
-            max(
-                center_x,
-                bubble_x + 16,
-            ),
-            bubble_x
-            + bubble_width
-            - 16,
-        )
-
-
+        # Corpo + ponta num unico contorno continuo.
         self.canvas.create_polygon(
-            [
-                tip - 7,
-                bubble_y + bubble_height,
-
-                tip + 7,
-                bubble_y + bubble_height,
-
-                tip,
-                top_y - 2,
-            ],
+            self._rounded_points(
+                bx,
+                by,
+                bx + bw,
+                by + bh,
+                RADIUS,
+                tail=(tip_x, top_y - 3),
+            ),
+            smooth=True,
             fill=colors["bub_bg"],
             outline=colors["bub_bd"],
-        )
-
-
-        self.canvas.create_line(
-            bubble_x + 2,
-            bubble_y + bubble_height,
-            tip - 7,
-            bubble_y + bubble_height,
-            fill=colors["bub_bd"],
             width=2,
         )
 
+        # Texto
+        font = self._text_font(mode)
+        line_h = layout["line_h"]
+        text_y = by + PAD_Y
 
-        self.canvas.create_line(
-            tip + 7,
-            bubble_y + bubble_height,
-            bubble_x + bubble_width - 2,
-            bubble_y + bubble_height,
-            fill=colors["bub_bd"],
-            width=2,
-        )
-
-
-        # Text.
-        text_y = (
-            bubble_y
-            + padding_y
-        )
-
-
-        for index, line in enumerate(
-            wrapped
-        ):
+        for index, line in enumerate(layout["wrapped"]):
             self.canvas.create_text(
-                bubble_x
-                + bubble_width // 2,
-
-                text_y
-                + index * line_h
-                + line_h // 2,
-
+                bx + bw / 2,
+                text_y + index * line_h + line_h / 2,
                 text=line,
                 fill=colors["text"],
-                font=(
-                    "Consolas",
-                    8,
-                ),
+                font=font,
                 anchor="center",
             )
 
-
         if mode == "alert":
-            self._draw_alert_buttons(
-                layout,
-                hover,
-            )
-
+            self._draw_alert_buttons(layout, hover)
 
         elif mode == "snooze":
-            self._draw_snooze_buttons(
-                layout,
-                hover,
-            )
-
+            self._draw_snooze_buttons(layout, hover)
 
     def _draw_alert_buttons(
         self,
@@ -338,108 +400,26 @@ class BubbleRenderer:
         hover,
     ):
         colors = self.palette
+        font = self._font(8, "bold")
 
-        button_y = layout[
-            "button_y"
-        ]
+        estilos = {
+            # botao: (cor principal)
+            "complete": colors["green"],
+            "snooze": colors["accent"],
+        }
 
-        complete_x = layout[
-            "complete_x"
-        ]
+        for key, button in layout["buttons"].items():
+            cor = estilos[key]
+            ativo = hover == key
 
-        snooze_x = layout[
-            "snooze_x"
-        ]
-
-
-        complete_active = (
-            hover == "complete"
-        )
-
-
-        self.canvas.create_oval(
-            complete_x - 11,
-            button_y,
-            complete_x + 11,
-            button_y + 22,
-            fill=(
-                colors["green"]
-                if complete_active
-                else colors["panel"]
-            ),
-            outline=colors["green"],
-            width=2,
-        )
-
-
-        self.canvas.create_text(
-            complete_x,
-            button_y + 11,
-            text="✓",
-            fill="#ffffff",
-            font=(
-                "Consolas",
-                11,
-                "bold",
-            ),
-        )
-
-
-        self.canvas.create_text(
-            complete_x,
-            button_y + 29,
-            text="concluir",
-            fill=colors["dim"],
-            font=(
-                "Consolas",
-                7,
-            ),
-        )
-
-
-        snooze_active = (
-            hover == "snooze"
-        )
-
-
-        self.canvas.create_oval(
-            snooze_x - 11,
-            button_y,
-            snooze_x + 11,
-            button_y + 22,
-            fill=(
-                colors["accent"]
-                if snooze_active
-                else colors["panel"]
-            ),
-            outline=colors["accent"],
-            width=2,
-        )
-
-
-        self.canvas.create_text(
-            snooze_x,
-            button_y + 11,
-            text="⏰",
-            fill="#ffffff",
-            font=(
-                "Segoe UI Symbol",
-                9,
-            ),
-        )
-
-
-        self.canvas.create_text(
-            snooze_x,
-            button_y + 29,
-            text="adiar",
-            fill=colors["dim"],
-            font=(
-                "Consolas",
-                7,
-            ),
-        )
-
+            self._pill(
+                button["box"],
+                fill=cor if ativo else colors["bub_bg"],
+                outline=cor,
+                text=button["label"],
+                text_color="#FFFFFF" if ativo else cor,
+                font=font,
+            )
 
     def _draw_snooze_buttons(
         self,
@@ -447,104 +427,31 @@ class BubbleRenderer:
         hover,
     ):
         colors = self.palette
+        font = self._font(8, "bold")
 
-        button_y = layout[
-            "button_y"
-        ]
+        for key, button in layout["buttons"].items():
+            ativo = hover == key
 
+            if button.get("link"):
+                x1, y1, x2, y2 = button["box"]
 
-        options = [
-            (
-                "5",
-                "5m",
-            ),
-            (
-                "15",
-                "15m",
-            ),
-            (
-                "30",
-                "30m",
-            ),
-            (
-                "60",
-                "1h",
-            ),
-        ]
+                self.canvas.create_text(
+                    (x1 + x2) / 2,
+                    (y1 + y2) / 2,
+                    text=button["label"],
+                    fill=colors["accent"] if ativo else colors["dim"],
+                    font=self._font(8),
+                )
+                continue
 
-
-        for value, label in options:
-
-            x = (
-                layout[
-                    "option_x"
-                ][value]
-            )
-
-            active = (
-                hover == value
-            )
-
-
-            self.canvas.create_oval(
-                x - 14,
-                button_y,
-                x + 14,
-                button_y + 24,
-                fill=(
-                    colors["accent"]
-                    if active
-                    else colors["panel"]
-                ),
+            self._pill(
+                button["box"],
+                fill=colors["accent"] if ativo else colors["bub_bg"],
                 outline=colors["accent"],
-                width=1,
+                text=button["label"],
+                text_color="#FFFFFF" if ativo else colors["accent"],
+                font=font,
             )
-
-
-            self.canvas.create_text(
-                x,
-                button_y + 12,
-                text=label,
-                fill="#ffffff",
-                font=(
-                    "Consolas",
-                    7,
-                    "bold",
-                ),
-            )
-
-
-        back_y = layout[
-            "back_y"
-        ]
-
-
-        active = (
-            hover == "back"
-        )
-
-
-        self.canvas.create_text(
-            layout["bx"]
-            + layout["bw"] // 2,
-
-            back_y,
-
-            text="↩ voltar",
-
-            fill=(
-                colors["accent"]
-                if active
-                else colors["dim"]
-            ),
-
-            font=(
-                "Consolas",
-                7,
-                "bold",
-            ),
-        )
-
 
     # ========================================================
     # HIT TEST
@@ -566,17 +473,14 @@ class BubbleRenderer:
         ):
             return None
 
-
         if not text:
             return None
-
 
         bob = int(
             math.sin(
                 t * 1.4
             ) * 3
         )
-
 
         if sprite_height is not None:
             top_y = (
@@ -593,7 +497,6 @@ class BubbleRenderer:
                 + bob
             )
 
-
         layout = self.layout(
             text,
             self.width // 2,
@@ -601,107 +504,20 @@ class BubbleRenderer:
             mode,
         )
 
-
         if layout is None:
             return None
 
+        # Margem extra deixa os botoes faceis de acertar,
+        # mesmo com o MARVIN balancando.
+        folga = 3
 
-        bubble_x = layout[
-            "bx"
-        ]
-
-        bubble_width = layout[
-            "bw"
-        ]
-
-        button_y = layout[
-            "button_y"
-        ]
-
-
-        if mode == "alert":
-
-            complete_x = layout[
-                "complete_x"
-            ]
-
-            snooze_x = layout[
-                "snooze_x"
-            ]
-
+        for key, button in layout["buttons"].items():
+            x1, y1, x2, y2 = button["box"]
 
             if (
-                (
-                    x - complete_x
-                ) ** 2
-                + (
-                    y
-                    - (
-                        button_y + 11
-                    )
-                ) ** 2
-                <= 16 ** 2
+                x1 - folga <= x <= x2 + folga
+                and y1 - folga <= y <= y2 + folga
             ):
-                return "complete"
-
-
-            if (
-                (
-                    x - snooze_x
-                ) ** 2
-                + (
-                    y
-                    - (
-                        button_y + 11
-                    )
-                ) ** 2
-                <= 16 ** 2
-            ):
-                return "snooze"
-
-
-        elif mode == "snooze":
-
-            for value, x_button in (
-                layout[
-                    "option_x"
-                ].items()
-            ):
-
-                if (
-                    (
-                        x - x_button
-                    ) ** 2
-                    + (
-                        y
-                        - (
-                            button_y + 12
-                        )
-                    ) ** 2
-                    <= 18 ** 2
-                ):
-                    return value
-
-
-            back_y = layout[
-                "back_y"
-            ]
-
-
-            if (
-                abs(
-                    x
-                    - (
-                        bubble_x
-                        + bubble_width // 2
-                    )
-                ) <= 45
-
-                and abs(
-                    y - back_y
-                ) <= 12
-            ):
-                return "back"
-
+                return key
 
         return None
