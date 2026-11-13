@@ -68,7 +68,9 @@ Pressione **`Ctrl+Alt+M`** em qualquer programa (ou use o menu da bandeja) e esc
 | `ligar pro cliente sexta 9h30` | Ligar pro cliente — sexta, 09:30 |
 | `revisar relatório em 2 horas` | Revisar relatório — daqui a 2 horas |
 
-Uma prévia mostra o que foi entendido antes de salvar. Tudo é interpretado localmente, sem internet. O atalho pode ser trocado pela chave `atalho_captura` em `%USERPROFILE%\.marvin\config.json`.
+Uma prévia mostra o que foi entendido antes de salvar. Tudo é interpretado localmente, sem internet.
+
+Se o atalho não responder (algum outro programa pode estar usando a mesma combinação), troque-o em **Configurações → Atalhos**: clique no botão, pressione a nova combinação e ela passa a valer na hora.
 
 ### Recorrência
 

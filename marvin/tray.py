@@ -306,11 +306,7 @@ class TrayController:
             ),
 
             pystray.MenuItem(
-                (
-                    f"Captura rápida ({self._quick_capture_hotkey})"
-                    if self._quick_capture_hotkey
-                    else "Captura rápida"
-                ),
+                lambda item: self._quick_capture_label(),
                 lambda icon, item:
                     self.dispatch(
                         self._on_quick_capture
@@ -382,6 +378,22 @@ class TrayController:
 
         logger.info(
             "Icone da bandeja iniciado."
+        )
+
+
+    def _quick_capture_label(self):
+        atalho = self._quick_capture_hotkey
+
+        if callable(atalho):
+            try:
+                atalho = atalho()
+            except Exception:
+                atalho = ""
+
+        return (
+            f"Captura rápida ({atalho})"
+            if atalho
+            else "Captura rápida"
         )
 
 

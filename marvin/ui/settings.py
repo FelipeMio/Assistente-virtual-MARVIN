@@ -12,6 +12,7 @@ from tkinter import messagebox
 from PIL import Image, ImageTk
 
 from ..config import save_cfg
+from ..hotkey import atalho_de_evento
 from ..theme import get_modern_palette
 
 
@@ -1108,6 +1109,17 @@ class SettingsWindow:
         )
 
         # ======================================================
+        # ATALHOS
+        # ======================================================
+
+        self._section_title(
+            body,
+            "Atalhos"
+        )
+
+        self._shortcut_card(body)
+
+        # ======================================================
         # TAMANHO
         # ======================================================
 
@@ -1652,6 +1664,211 @@ class SettingsWindow:
     # ==========================================================
     # SALVAR
     # ==========================================================
+
+    # ==========================================================
+    # ATALHO DA CAPTURA RAPIDA
+    # ==========================================================
+
+    def _hotkey(self):
+        return getattr(self.comp, "_hotkey", None)
+
+    def _shortcut_card(self, parent):
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=self.colors["surface"],
+            corner_radius=10,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+        card.pack(fill="x")
+
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(fill="x", padx=12, pady=(10, 4))
+
+        textos = ctk.CTkFrame(row, fg_color="transparent")
+        textos.pack(side="left", fill="x", expand=True)
+
+        ctk.CTkLabel(
+            textos,
+            text="Captura rápida",
+            text_color=self.colors["text"],
+            anchor="w",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
+        ).pack(fill="x")
+
+        ctk.CTkLabel(
+            textos,
+            text="Cria tarefas escrevendo, de qualquer programa.",
+            text_color=self.colors["dim"],
+            anchor="w",
+            font=ctk.CTkFont(family="Segoe UI", size=9)
+        ).pack(fill="x", pady=(1, 0))
+
+        hk = self._hotkey()
+        atual = hk.atalho if hk else self.cfg.get("atalho_captura", "Ctrl+Alt+M")
+
+        self.btn_atalho = ctk.CTkButton(
+            row,
+            text=atual,
+            width=120,
+            height=32,
+            corner_radius=8,
+            fg_color=self.colors["card"],
+            hover_color=self.colors["surface"],
+            border_width=1,
+            border_color=self.colors["border"],
+            text_color=self.colors["text"],
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            command=self._gravar_atalho
+        )
+        self.btn_atalho.pack(side="right", padx=(12, 0))
+
+        self.lbl_atalho = ctk.CTkLabel(
+            card,
+            text="",
+            anchor="w",
+            justify="left",
+            wraplength=self.WIDTH - 90,
+            font=ctk.CTkFont(family="Segoe UI", size=9)
+        )
+        self.lbl_atalho.pack(fill="x", padx=12, pady=(0, 10))
+
+        self._gravando = False
+        self._status_atalho()
+
+        self.win.bind("<Destroy>", self._ao_fechar_atalho, add="+")
+
+    def _status_atalho(self, texto=None, erro=False):
+        hk = self._hotkey()
+
+        if texto is None:
+            if hk is None:
+                texto, erro = "Atalho global indisponível neste sistema.", True
+            elif hk.registrado:
+                texto = "Ativo. Clique no botão para trocar a combinação."
+            else:
+                texto = (
+                    f"{hk.atalho} não pôde ser ativado: outro programa já usa. "
+                    "Clique no botão para escolher outro."
+                )
+                erro = True
+
+        self.lbl_atalho.configure(
+            text=texto,
+            text_color=(
+                self.colors["danger_fg"] if erro else self.colors["dim"]
+            )
+        )
+
+    def _gravar_atalho(self):
+        if self._gravando:
+            return
+
+        hk = self._hotkey()
+
+        if hk is None:
+            return
+
+        self._gravando = True
+
+        # Solta o atalho atual para a combinacao chegar aqui.
+        hk.stop()
+
+        self.btn_atalho.configure(
+            text="Pressione…",
+            border_color=self.colors["accent"],
+            text_color=self.colors["accent"]
+        )
+
+        self._status_atalho(
+            "Pressione a nova combinação (Ctrl e/ou Alt + letra, número, "
+            "F1–F12 ou espaço). Se nada acontecer, outro programa usa "
+            "essa combinação: tente outra. Esc cancela."
+        )
+
+        self.win.unbind("<Escape>")
+        self.win.bind("<KeyPress>", self._tecla_atalho)
+        self.win.focus_force()
+
+    def _tecla_atalho(self, event):
+        if not self._gravando:
+            return None
+
+        if event.keysym == "Escape":
+            self._fim_gravacao()
+            self._status_atalho()
+            return "break"
+
+        novo = atalho_de_evento(event.keysym, event.state)
+
+        if novo is None:
+            # So modificadores por enquanto.
+            return "break"
+
+        if novo == "":
+            self._status_atalho(
+                "Use Ctrl e/ou Alt junto com uma letra, número, "
+                "F1–F12 ou espaço.",
+                erro=True
+            )
+            return "break"
+
+        hk = self._hotkey()
+        ok = hk.alterar(novo)
+
+        self._fim_gravacao(reativar=False)
+
+        if ok:
+            self.cfg["atalho_captura"] = novo
+            save_cfg(self.cfg)
+
+            self._status_atalho(
+                f"Pronto! Agora a captura rápida abre com {novo}."
+            )
+
+        else:
+            self._status_atalho(
+                f"{novo} já é usado por outro programa. "
+                f"Continuando com {hk.atalho}.",
+                erro=True
+            )
+
+        return "break"
+
+    def _fim_gravacao(self, reativar=True):
+        self._gravando = False
+
+        try:
+            self.win.unbind("<KeyPress>")
+            self.win.bind("<Escape>", lambda e: self.win.destroy())
+        except Exception:
+            pass
+
+        hk = self._hotkey()
+
+        if reativar and hk is not None and not hk.registrado:
+            hk.start()
+
+        try:
+            self.btn_atalho.configure(
+                text=hk.atalho if hk else "",
+                border_color=self.colors["border"],
+                text_color=self.colors["text"]
+            )
+        except Exception:
+            pass
+
+    def _ao_fechar_atalho(self, event):
+        # Fechar a janela no meio da gravacao nao pode
+        # deixar o MARVIN sem atalho.
+        if event.widget is not self.win or not self._gravando:
+            return
+
+        self._gravando = False
+        hk = self._hotkey()
+
+        if hk is not None and not hk.registrado:
+            hk.start()
 
     def _salvar(self):
         tema_anterior = self.cfg.get(

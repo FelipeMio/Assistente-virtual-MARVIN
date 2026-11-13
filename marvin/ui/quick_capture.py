@@ -1,11 +1,18 @@
 """Captura rapida: cria tarefas a partir de uma frase."""
 
 import datetime
+import logging
 
 import customtkinter as ctk
 
 from ..quick_parse import descrever_data, interpretar
 from .branding import round_window, title_icon
+from .win_focus import trazer_para_frente
+
+
+logger = logging.getLogger(
+    "marvin.quick_capture"
+)
 
 
 EXEMPLOS = (
@@ -298,7 +305,7 @@ class QuickCaptureWindow:
     def _mostrar(self):
         self.win.update_idletasks()
 
-        largura = self.win.winfo_reqwidth()
+        largura = max(self.WIDTH, self.win.winfo_reqwidth())
         sw = self.win.winfo_screenwidth()
         sh = self.win.winfo_screenheight()
 
@@ -307,17 +314,22 @@ class QuickCaptureWindow:
         y = int(sh * 0.22)
 
         self.win.geometry(f"+{x}+{y}")
-        self.win.deiconify()
         self.focar()
 
+        # Alguns programas devolvem o foco logo em seguida;
+        # uma segunda tentativa curta garante o cursor no campo.
+        self.win.after(150, self.focar)
+
     def focar(self):
-        try:
-            self.win.lift()
-            self.win.attributes("-topmost", True)
-            self.win.focus_force()
-            self.entry.focus_set()
-        except Exception:
-            pass
+        if not self.existe():
+            return
+
+        conseguiu = trazer_para_frente(self.win, self.entry)
+
+        logger.info(
+            "Captura rapida na frente (foco do teclado: %s).",
+            "sim" if conseguiu else "nao",
+        )
 
     def _drag_start(self, event):
         self._drag = (

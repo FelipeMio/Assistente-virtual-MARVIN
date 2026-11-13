@@ -76,6 +76,57 @@ def parse_atalho(texto):
     return mods, vk
 
 
+# Bits de modificadores nos eventos do Tk no Windows.
+TK_SHIFT = 0x0001
+TK_CONTROL = 0x0004
+TK_ALT = 0x20000
+
+TECLAS_MODIFICADORAS = {
+    "Control_L", "Control_R", "Alt_L", "Alt_R", "Shift_L", "Shift_R",
+    "Win_L", "Win_R", "Super_L", "Super_R", "Meta_L", "Meta_R",
+    "Caps_Lock", "Num_Lock", "ISO_Level3_Shift",
+}
+
+
+def atalho_de_evento(keysym, state):
+    """
+    Converte uma tecla capturada pelo Tk em "Ctrl+Alt+K".
+
+    Devolve None enquanto so modificadores estao pressionados
+    e "" quando a combinacao nao serve como atalho global
+    (precisa de Ctrl ou Alt, para nao atrapalhar a digitacao).
+    """
+    if keysym in TECLAS_MODIFICADORAS:
+        return None
+
+    partes = []
+
+    if state & TK_CONTROL:
+        partes.append("Ctrl")
+
+    if state & TK_ALT:
+        partes.append("Alt")
+
+    if state & TK_SHIFT:
+        partes.append("Shift")
+
+    if not ({"Ctrl", "Alt"} & set(partes)):
+        return ""
+
+    if len(keysym) == 1 and keysym.isalnum():
+        tecla = keysym.upper()
+    elif keysym.lower() == "space":
+        tecla = "Space"
+    elif keysym.upper().startswith("F") and keysym[1:].isdigit() and 1 <= int(keysym[1:]) <= 12:
+        tecla = keysym.upper()
+    else:
+        return ""
+
+    atalho = "+".join(partes + [tecla])
+
+    return atalho if parse_atalho(atalho) else ""
+
+
 class GlobalHotkey:
 
     HOTKEY_ID = 0x4D41  # "MA"
@@ -95,6 +146,7 @@ class GlobalHotkey:
         self._thread_id = None
         self._job = None
         self._parado = False
+        self._pronto = threading.Event()
 
         self.registrado = False
 
@@ -111,9 +163,11 @@ class GlobalHotkey:
 
         if combinacao is None:
             logger.warning("Atalho invalido: %s", self.atalho)
+            self._pronto.set()
             return
 
         self._parado = False
+        self._pronto = threading.Event()
 
         self._thread = threading.Thread(
             target=self._loop,
@@ -159,6 +213,34 @@ class GlobalHotkey:
         self._thread = None
         self._thread_id = None
 
+    def _iniciar_e_esperar(self, timeout=1.0):
+        self.start()
+        self._pronto.wait(timeout)
+        return self.registrado
+
+    def alterar(self, novo):
+        """
+        Troca o atalho na hora. Se o novo nao puder ser
+        registrado, volta para o anterior e devolve False.
+        """
+        if parse_atalho(novo) is None:
+            return False
+
+        antigo = self.atalho
+
+        self.stop()
+        self.atalho = novo
+
+        if self._iniciar_e_esperar():
+            logger.info("Atalho alterado de %s para %s.", antigo, novo)
+            return True
+
+        self.stop()
+        self.atalho = antigo
+        self._iniciar_e_esperar()
+
+        return False
+
     # ========================================================
     # THREAD DO WINDOWS
     # ========================================================
@@ -183,9 +265,11 @@ class GlobalHotkey:
                 "(talvez outro programa ja use esse atalho).",
                 self.atalho,
             )
+            self._pronto.set()
             return
 
         self.registrado = True
+        self._pronto.set()
         logger.info("Atalho global %s registrado.", self.atalho)
 
         msg = wintypes.MSG()
@@ -196,6 +280,7 @@ class GlobalHotkey:
                     msg.message == WM_HOTKEY
                     and msg.wParam == self.HOTKEY_ID
                 ):
+                    logger.info("Atalho %s pressionado.", self.atalho)
                     self._fila.put(True)
 
         finally:

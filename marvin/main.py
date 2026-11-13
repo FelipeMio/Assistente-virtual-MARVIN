@@ -1019,10 +1019,8 @@ class MarvinCompanion:
             on_settings=self._tray_settings,
             on_exit=self._on_close,
             on_quick_capture=self._open_quick_capture,
-            quick_capture_hotkey=cfg.get(
-                "atalho_captura",
-                "Ctrl+Alt+M",
-            ),
+            quick_capture_hotkey=lambda:
+                self._hotkey.atalho,
         )
 
         # Atalho global para a captura rapida.

@@ -1,4 +1,4 @@
-﻿import customtkinter as ctk
+import customtkinter as ctk
 
 from marvin.config import load_cfg
 from marvin.theme import get_modern_palette
@@ -57,8 +57,6 @@ class B2BAlertWindow:
         self._drag = (0, 0)
 
         self._build(mensagem, restantes)
-
-        self.win.bind("<Return>", lambda e: self._entendi())
 
         self.win.after(
             30,
