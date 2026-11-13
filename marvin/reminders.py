@@ -181,10 +181,6 @@ class ReminderService:
                 datetime.datetime.now()
             )
 
-            today = now.strftime(
-                "%Y-%m-%d"
-            )
-
             try:
                 rows = self._list_tasks(
                     apenas_pendentes=True
@@ -203,134 +199,8 @@ class ReminderService:
                 if self._stop_event.is_set():
                     break
 
-
-                try:
-                    (
-                        tid,
-                        texto,
-                        desc,
-                        data,
-                        hora,
-                        rep,
-                        conc,
-                        lemb,
-                    ) = row
-
-                except Exception:
-                    continue
-
-
-                # Tarefas recorrentes usam a flag "lembrado"
-                # para evitar repetir a mesma ocorrencia.
-                #
-                # Tarefas comuns nao podem ser descartadas por
-                # essa flag: se o MARVIN foi fechado antes de o
-                # usuario concluir/adiar, o alerta precisa voltar
-                # na proxima execucao.
                 if (
-                    lemb
-                    and rep != "Nunca"
-                ):
-                    continue
-
-
-                try:
-                    hora_s = hora[:5]
-
-                except (TypeError, IndexError):
-                    continue
-
-
-                try:
-                    data_original = (
-                        datetime.date
-                        .fromisoformat(
-                            data
-                        )
-                    )
-
-                except (
-                    TypeError,
-                    ValueError,
-                ):
-                    continue
-
-
-                hoje_data = now.date()
-
-
-                if hoje_data < data_original:
-                    continue
-
-
-                if rep == "Nunca":
-                    data_lembrete = (
-                        data_original
-                    )
-
-                else:
-                    if not self.should_remind(
-                        rep,
-                        data,
-                        now,
-                        today,
-                    ):
-                        continue
-
-                    data_lembrete = (
-                        hoje_data
-                    )
-
-
-                try:
-                    hora_obj = (
-                        datetime.datetime
-                        .strptime(
-                            hora_s,
-                            "%H:%M",
-                        )
-                        .time()
-                    )
-
-                except (
-                    TypeError,
-                    ValueError,
-                ):
-                    continue
-
-
-                task_dt = (
-                    datetime.datetime
-                    .combine(
-                        data_lembrete,
-                        hora_obj,
-                    )
-                )
-
-
-                diff = (
-                    now - task_dt
-                ).total_seconds()
-
-
-                # Tarefa comum:
-                # depois que vence, continua pendente ate
-                # o usuario concluir ou adiar.
-                if rep == "Nunca":
-                    due = (
-                        diff >= 0
-                    )
-
-                # Tarefa recorrente:
-                # mantem a janela curta da ocorrencia atual.
-                else:
-                    due = (
-                        0 <= diff < 90
-                    )
-
-
-                if (
-                    due
+                    self.is_due(row, now)
                     and not self._stop_event.is_set()
                 ):
                     try:
@@ -342,6 +212,91 @@ class ReminderService:
 
                     except tk.TclError:
                         return
+
+
+    @classmethod
+    def is_due(
+        cls,
+        row,
+        now,
+    ):
+        """
+        Decide se a tarefa `row` deve ser lembrada em `now`.
+
+        Funcao pura (sem banco e sem Tk) para poder ser testada.
+        """
+        try:
+            (
+                tid,
+                texto,
+                desc,
+                data,
+                hora,
+                rep,
+                conc,
+                lemb,
+            ) = row
+
+        except Exception:
+            return False
+
+        # Tarefas recorrentes usam a flag "lembrado"
+        # para evitar repetir a mesma ocorrencia.
+        #
+        # Tarefas comuns nao podem ser descartadas por
+        # essa flag: se o MARVIN foi fechado antes de o
+        # usuario concluir/adiar, o alerta precisa voltar
+        # na proxima execucao.
+        if lemb and rep != "Nunca":
+            return False
+
+        try:
+            hora_s = hora[:5]
+            data_original = datetime.date.fromisoformat(data)
+            hora_obj = (
+                datetime.datetime
+                .strptime(hora_s, "%H:%M")
+                .time()
+            )
+
+        except (TypeError, ValueError, IndexError):
+            return False
+
+        hoje_data = now.date()
+
+        if hoje_data < data_original:
+            return False
+
+        if rep == "Nunca":
+            data_lembrete = data_original
+
+        else:
+            if not cls.should_remind(
+                rep,
+                data,
+                now,
+                now.strftime("%Y-%m-%d"),
+            ):
+                return False
+
+            data_lembrete = hoje_data
+
+        task_dt = datetime.datetime.combine(
+            data_lembrete,
+            hora_obj,
+        )
+
+        diff = (now - task_dt).total_seconds()
+
+        # Tarefa comum:
+        # depois que vence, continua pendente ate
+        # o usuario concluir ou adiar.
+        if rep == "Nunca":
+            return diff >= 0
+
+        # Tarefa recorrente:
+        # mantem a janela curta da ocorrencia atual.
+        return 0 <= diff < 90
 
 
     @staticmethod

@@ -72,6 +72,17 @@ Uma prévia mostra o que foi entendido antes de salvar. Tudo é interpretado loc
 
 Se o atalho não responder (algum outro programa pode estar usando a mesma combinação), troque-o em **Configurações → Atalhos**: clique no botão, pressione a nova combinação e ela passa a valer na hora.
 
+### Enquanto você estava fora
+
+Quando o computador fica parado por 10 minutos ou mais (inclusive com a tela bloqueada), o MARVIN percebe a ausência. Na volta, ele mostra um resumo único do período:
+
+- avisos recebidos, separados por origem (ex.: B2B, GOE);
+- lembretes que venceram enquanto você não estava;
+- itens do checklist ainda pendentes;
+- o próximo compromisso.
+
+Cada item tem um atalho para a tela correspondente. O resumo não toma o foco do teclado e pode ser desligado em **Configurações → Comportamento → Resumo ao voltar**.
+
 ### Recorrência
 
 O MARVIN suporta tarefas:

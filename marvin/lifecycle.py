@@ -30,13 +30,20 @@ class LifecycleController:
         start_animation,
         stop_animation,
         start_day_delay_ms=900,
-        hotkey=None,
+        services=(),
     ):
         self.root = root
         self.companion = companion
 
         self.tray = tray
-        self.hotkey = hotkey
+
+        # Servicos extras com start()/stop()
+        # (atalho global, monitor de ausencia...).
+        self.services = [
+            service
+            for service in services
+            if service is not None
+        ]
         self.reminders = reminders
         self.routine = routine
 
@@ -109,12 +116,13 @@ class LifecycleController:
 
         self.tray.start()
 
-        if self.hotkey is not None:
+        for service in self.services:
             try:
-                self.hotkey.start()
+                service.start()
             except Exception:
                 logger.exception(
-                    "Erro ao iniciar o atalho global."
+                    "Erro ao iniciar %s.",
+                    type(service).__name__,
                 )
 
         self._start_animation()
@@ -239,10 +247,10 @@ class LifecycleController:
             "bandeja",
         )
 
-        if self.hotkey is not None:
+        for service in reversed(self.services):
             self._stop_service(
-                self.hotkey,
-                "atalho global",
+                service,
+                type(service).__name__,
             )
 
         self._join_cleanup_thread()

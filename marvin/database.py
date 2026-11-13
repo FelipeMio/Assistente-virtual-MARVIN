@@ -278,15 +278,18 @@ def db_prioridade(tid):
 def _proxima_data_recorrente(
     data_atual,
     recorrencia,
-    data_base=None
+    data_base=None,
+    hoje=None,
 ):
     """
     Calcula a proxima ocorrencia de uma tarefa recorrente.
 
     A data salva na tarefa representa sempre a proxima
     ocorrencia que ainda precisa ser feita.
+
+    `hoje` existe para os testes; no app e sempre a data atual.
     """
-    hoje = datetime.date.today()
+    hoje = hoje or datetime.date.today()
 
     try:
         original = datetime.date.fromisoformat(data_atual)

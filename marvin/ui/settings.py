@@ -1072,6 +1072,13 @@ class SettingsWindow:
             value=self._startup_enabled()
         )
 
+        self.v_resumo = tk.BooleanVar(
+            value=self.cfg.get(
+                "resumo_ausencia",
+                True
+            )
+        )
+
         behavior_card = ctk.CTkFrame(
             body,
             fg_color=self.colors["surface"],
@@ -1106,6 +1113,23 @@ class SettingsWindow:
             "Iniciar com o Windows",
             "Abre o MARVIN automaticamente ao entrar.",
             self.v_startup
+        )
+
+        ctk.CTkFrame(
+            behavior_card,
+            height=1,
+            corner_radius=0,
+            fg_color=self.colors["border"]
+        ).pack(
+            fill="x",
+            padx=12
+        )
+
+        self._toggle_row(
+            behavior_card,
+            "Resumo ao voltar",
+            "Mostra o que aconteceu enquanto você estava fora.",
+            self.v_resumo
         )
 
         # ======================================================
@@ -1879,6 +1903,8 @@ class SettingsWindow:
         self.cfg["tema"] = self.v_tema.get()
 
         self.cfg["som"] = self.v_som.get()
+
+        self.cfg["resumo_ausencia"] = self.v_resumo.get()
 
         self.cfg["opacidade"] = round(
             self.v_op.get(),

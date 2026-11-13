@@ -21,6 +21,8 @@ CFG_DEFAULTS = {
     "tamanho_compacto": 85,
     "idle_interval_seconds": 300,
     "atalho_captura": "Ctrl+Alt+M",
+    "resumo_ausencia": True,
+    "ausencia_minutos": 10,
     "ultimo_resumo_dia": None,
     "frases_idle": [
         "Clique com botao esquerdo para o menu.",

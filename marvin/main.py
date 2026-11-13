@@ -57,6 +57,9 @@ from .ui.new_task import NewTaskWindow as NewTaskWindowUI
 from .ui.task_list import TaskWindow as TaskWindowUI
 from .ui.quick_capture import QuickCaptureWindow as QuickCaptureWindowUI
 from .hotkey import GlobalHotkey
+from .away import AwayMonitor, montar_resumo
+from .ui.away_summary import AwaySummaryWindow
+from .checklist import listar_hoje as checklist_hoje
 
 from marvin.database import (
     DB_F,
@@ -1032,6 +1035,17 @@ class MarvinCompanion:
             ),
             self._open_quick_capture,
         )
+
+        # "Enquanto voce estava fora"
+        self._away = AwayMonitor(
+            self.root,
+            on_return=self._on_return_from_away,
+            enabled=lambda:
+                bool(cfg.get("resumo_ausencia", True)),
+            limite_segundos=(
+                max(1, int(cfg.get("ausencia_minutos", 10))) * 60
+            ),
+        )
         
         
 
@@ -1123,7 +1137,10 @@ class MarvinCompanion:
                 self._stop_animation
             ),
             start_day_delay_ms=900,
-            hotkey=self._hotkey,
+            services=(
+                self._hotkey,
+                self._away,
+            ),
         )
 
         self._lifecycle.start()
@@ -1187,6 +1204,71 @@ class MarvinCompanion:
             abrir_config=lambda:
                 SettingsWindow(self.root, self),
         )
+
+
+    def _on_return_from_away(self, inicio, fim):
+        notificacoes = []
+        manager = getattr(self, "notifications", None)
+
+        if manager is not None:
+            try:
+                notificacoes = manager.listar()
+            except Exception:
+                logger.exception("Erro ao ler notificacoes.")
+
+        try:
+            checklist_pendentes = sum(
+                1
+                for item in checklist_hoje()
+                if not item["concluido"]
+            )
+        except Exception:
+            checklist_pendentes = 0
+
+        resumo = montar_resumo(
+            inicio,
+            fim,
+            agora=datetime.datetime.now(),
+            notificacoes=notificacoes,
+            tarefas_pendentes=db_listar(apenas_pendentes=True),
+            checklist_pendentes=checklist_pendentes,
+        )
+
+        # Nao atrapalha um lembrete ou aviso que ja esta no balao.
+        pode_falar = self.state != "alert"
+
+        if resumo.vazio:
+            if pode_falar:
+                self.say("Bem-vindo de volta!", "talking", 3000)
+            return
+
+        anterior = getattr(self, "_away_window", None)
+
+        if anterior is not None and anterior.existe():
+            anterior.fechar()
+
+        self._away_window = AwaySummaryWindow(
+            self.root,
+            resumo,
+            config=cfg,
+            palette_factory=get_modern_palette,
+            on_ver_avisos=self._open_notifications_history,
+            on_ver_tarefas=lambda: TaskWindow(self.root, self),
+            on_abrir_checklist=lambda: abrir_checklist(self.root),
+        )
+
+        if pode_falar:
+            self.say(
+                "Bem-vindo de volta! Separei um resumo.",
+                "talking",
+                4000,
+            )
+
+
+    def _open_notifications_history(self):
+        from .ui.notifications_history import abrir_notificacoes
+
+        abrir_notificacoes(self.root, self)
 
 
     def _open_quick_capture(self):
