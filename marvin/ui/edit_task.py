@@ -3,6 +3,8 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import title_icon
+
 from tkinter import messagebox
 
 from ..theme import get_modern_palette
@@ -11,7 +13,7 @@ from ..theme import get_modern_palette
 class EditTaskWindow:
 
     WIDTH = 390
-    HEIGHT = 590
+    HEIGHT = 650
 
     def __init__(
         self,
@@ -69,8 +71,8 @@ class EditTaskWindow:
             messagebox.showwarning(
                 "MARVIN",
                 (
-                    "Esta tarefa nao foi encontrada.\n\n"
-                    "Ela pode ter sido excluida ou alterada "
+                    "Esta tarefa não foi encontrada.\n\n"
+                    "Ela pode ter sido excluída ou alterada "
                     "por outra janela."
                 ),
                 parent=parent,
@@ -359,28 +361,17 @@ class EditTaskWindow:
         )
 
 
-        marca = ctk.CTkFrame(
+        marca = title_icon(
             titlebar,
-            width=21,
-            height=21,
-            corner_radius=6,
-            fg_color=self.colors["accent"],
-        )
-
-        marca.pack(
-            side="left",
+            self.colors,
             padx=(14, 0),
-        )
-
-        marca.pack_propagate(
-            False
         )
 
 
         title_label = ctk.CTkLabel(
             titlebar,
             text="EDITAR TAREFA",
-            text_color=self.colors["text"],
+            text_color=self.colors["dim"],
             font=ctk.CTkFont(
                 family="Segoe UI",
                 size=10,
@@ -552,7 +543,7 @@ class EditTaskWindow:
 
         self._label(
             body,
-            "Titulo",
+            "Título",
             True,
         )
 
@@ -586,7 +577,7 @@ class EditTaskWindow:
 
         self._label(
             desc_wrap,
-            "Descricao",
+            "Descrição",
         )
 
 
@@ -676,7 +667,7 @@ class EditTaskWindow:
 
         self._label(
             hora_frame,
-            "Horario",
+            "Horário",
             True,
         )
 
@@ -755,7 +746,7 @@ class EditTaskWindow:
 
         self._label(
             repeat_wrap,
-            "Repeticao",
+            "Repetição",
         )
 
 
@@ -889,7 +880,7 @@ class EditTaskWindow:
 
         options = (
             ("Alta", "Alta"),
-            ("Media", "Normal"),
+            ("Média", "Normal"),
             ("Baixa", "Baixa"),
             ("Nenhuma", "Nenhuma"),
         )
@@ -1147,7 +1138,7 @@ class EditTaskWindow:
 
         if not txt:
             self.v_err.set(
-                "Titulo nao pode ser vazio."
+                "Título não pode ser vazio."
             )
 
             return
@@ -1174,7 +1165,7 @@ class EditTaskWindow:
 
         if data is None:
             self.v_err.set(
-                "Data invalida. Use DD/MM/AAAA "
+                "Data inválida. Use DD/MM/AAAA "
                 "ou AAAA-MM-DD."
             )
 
@@ -1183,7 +1174,7 @@ class EditTaskWindow:
 
         if hora is None:
             self.v_err.set(
-                "Horario invalido. Use HH:MM."
+                "Horário inválido. Use HH:MM."
             )
 
             return
@@ -1199,7 +1190,7 @@ class EditTaskWindow:
 
         except ValueError:
             self.v_err.set(
-                "Data ou horario invalido."
+                "Data ou horário inválido."
             )
 
             return

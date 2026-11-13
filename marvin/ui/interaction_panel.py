@@ -5,6 +5,8 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import marvin_icon
+
 from pathlib import Path
 from tkinter import messagebox
 
@@ -418,15 +420,7 @@ class InteractionPanel:
         )
 
         try:
-            self.header_marvin_image = ctk.CTkImage(
-                light_image=Image.open(
-                    icon_path
-                ),
-                dark_image=Image.open(
-                    icon_path
-                ),
-                size=(30, 30),
-            )
+            self.header_marvin_image = marvin_icon(30)
 
             ctk.CTkLabel(
                 header,

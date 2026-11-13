@@ -3,11 +3,13 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import title_icon, title_text
+
 
 class NewTaskWindow:
 
     WIDTH = 390
-    HEIGHT = 590
+    HEIGHT = 650
 
     def __init__(
         self,
@@ -316,51 +318,10 @@ class NewTaskWindow:
         )
 
 
-        marca = ctk.CTkFrame(
-            titlebar,
-            width=21,
-            height=21,
-            corner_radius=6,
-            fg_color=self.colors["accent"],
-        )
+        drag = (self._drag_start, self._drag_move)
 
-        marca.pack(
-            side="left",
-            padx=(14, 0),
-        )
-
-        marca.pack_propagate(
-            False
-        )
-
-        ctk.CTkLabel(
-            marca,
-            text="",
-            text_color="#FFFFFF",
-            font=ctk.CTkFont(
-                size=9,
-                weight="bold",
-            ),
-        ).place(
-            relx=0.5,
-            rely=0.5,
-            anchor="center",
-        )
-
-
-        ctk.CTkLabel(
-            titlebar,
-            text="NOVA TAREFA",
-            text_color=self.colors["text"],
-            font=ctk.CTkFont(
-                family="Segoe UI",
-                size=10,
-                weight="bold",
-            ),
-        ).pack(
-            side="left",
-            padx=(8, 0),
-        )
+        title_icon(titlebar, self.colors, drag=drag)
+        title_text(titlebar, self.colors, "Nova tarefa", drag=drag)
 
 
         ctk.CTkButton(

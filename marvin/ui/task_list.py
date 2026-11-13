@@ -3,6 +3,8 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import title_icon
+
 from tkinter import messagebox
 
 
@@ -432,10 +434,30 @@ class TaskWindow:
         )
 
 
-        ctk.CTkLabel(
+        title_icon(
+
+
             titlebar,
 
-            text="MARVIN — TAREFAS",
+
+            self.colors,
+
+
+            drag=(self._drag_start, self._drag_move),
+
+
+        )
+
+
+
+        ctk.CTkLabel(
+
+
+            titlebar,
+
+
+
+            text="TAREFAS",
 
             text_color=self.colors["dim"],
 
@@ -446,8 +468,14 @@ class TaskWindow:
             ),
 
         ).pack(
+
+
             side="left",
-            padx=16,
+
+
+            padx=(8, 0),
+
+
         )
 
 
@@ -730,10 +758,10 @@ class TaskWindow:
         # BUSCA
         # ====================================================
 
+        # Sem textvariable: o CustomTkinter so mostra o
+        # placeholder quando o campo nao esta ligado a uma variavel.
         self.search_entry = ctk.CTkEntry(
             body,
-
-            textvariable=self.busca,
 
             height=36,
 
@@ -758,6 +786,13 @@ class TaskWindow:
         self.search_entry.pack(
             fill="x",
             pady=(0, 13),
+        )
+
+        self.search_entry.bind(
+            "<KeyRelease>",
+            lambda e: self.busca.set(
+                self.search_entry.get()
+            ),
         )
 
 

@@ -2,6 +2,8 @@ from datetime import datetime
 
 import customtkinter as ctk
 
+from .branding import title_icon
+
 from marvin.config import load_cfg
 from marvin.theme import get_modern_palette
 
@@ -306,31 +308,10 @@ class NotificationHistoryWindow:
             padx=14,
         )
 
-        mark = ctk.CTkFrame(
+        mark = title_icon(
             left,
-            width=21,
-            height=21,
-            corner_radius=6,
-            fg_color=self.colors[
-                "accent"
-            ],
-        )
-
-        mark.pack(
-            side="left",
-        )
-
-        mark.pack_propagate(
-            False
-        )
-
-        ctk.CTkLabel(
-            mark,
-            text="",
-        ).place(
-            relx=0.5,
-            rely=0.5,
-            anchor="center",
+            self.colors,
+            padx=0,
         )
 
         title_label = ctk.CTkLabel(
@@ -363,7 +344,7 @@ class NotificationHistoryWindow:
 
         ctk.CTkButton(
             titlebar,
-            text="X",
+            text="×",
             width=28,
             height=28,
             corner_radius=7,
@@ -377,7 +358,7 @@ class NotificationHistoryWindow:
             border_width=0,
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=11,
+                size=17,
                 weight="bold",
             ),
             command=self.close,

@@ -4,6 +4,8 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import title_icon
+
 from pathlib import Path
 from tkinter import messagebox
 
@@ -863,29 +865,23 @@ class SettingsWindow:
 
         titlebar.pack_propagate(False)
 
-        mark = ctk.CTkLabel(
-            titlebar,
-            text="",
-            text_color=self.colors["accent"],
-            font=ctk.CTkFont(
-                family="Segoe UI",
-                size=15,
-                weight="bold"
-            )
-        )
+        mark = title_icon(
 
-        mark.pack(
-            side="left",
-            padx=(5, 8)
+            titlebar,
+
+            self.colors,
+
+            padx=(2, 8),
+
         )
 
         titulo = ctk.CTkLabel(
             titlebar,
-            text="MARVIN — CONFIGURAÇÕES",
-            text_color=self.colors["text"],
+            text="CONFIGURAÇÕES",
+            text_color=self.colors["dim"],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=11,
+                size=10,
                 weight="bold"
             )
         )
@@ -897,15 +893,16 @@ class SettingsWindow:
         fechar = ctk.CTkButton(
             titlebar,
             text="×",
-            width=32,
-            height=32,
-            corner_radius=8,
+            width=28,
+            height=28,
+            corner_radius=7,
             fg_color="transparent",
             hover_color=self.colors["surface"],
             text_color=self.colors["dim"],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=20
+                size=17,
+                weight="bold"
             ),
             command=self.win.destroy
         )
@@ -971,7 +968,7 @@ class SettingsWindow:
             anchor="w",
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=21,
+                size=17,
                 weight="bold"
             )
         ).pack(

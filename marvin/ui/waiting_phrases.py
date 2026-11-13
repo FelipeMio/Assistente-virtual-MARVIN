@@ -2,6 +2,8 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from .branding import title_icon
+
 from ..theme import get_modern_palette
 
 
@@ -181,30 +183,20 @@ class WaitingPhrasesWindow:
         )
 
 
-        mark = ctk.CTkLabel(
+        mark = title_icon(
             titlebar,
-            text="",
-            width=6,
-        )
-
-        mark.pack(
-            side="left",
-            padx=(5, 5),
+            self.colors,
+            padx=(2, 8),
         )
 
 
         title = ctk.CTkLabel(
             titlebar,
-            text=(
-                "MARVIN - "
-                "FRASES DE ESPERA"
-            ),
-            text_color=self.colors[
-                "text"
-            ],
+            text="FRASES DE ESPERA",
+            text_color=self.colors["dim"],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=11,
+                size=10,
                 weight="bold",
             ),
         )
@@ -216,10 +208,10 @@ class WaitingPhrasesWindow:
 
         close_button = ctk.CTkButton(
             titlebar,
-            text="x",
-            width=32,
-            height=32,
-            corner_radius=8,
+            text="×",
+            width=28,
+            height=28,
+            corner_radius=7,
             fg_color="transparent",
             hover_color=self.colors[
                 "surface"
@@ -229,7 +221,8 @@ class WaitingPhrasesWindow:
             ],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=15,
+                size=17,
+                weight="bold",
             ),
             command=self.win.destroy,
         )
@@ -293,7 +286,7 @@ class WaitingPhrasesWindow:
             ],
             font=ctk.CTkFont(
                 family="Segoe UI",
-                size=20,
+                size=17,
                 weight="bold",
             ),
         ).pack(
@@ -304,7 +297,7 @@ class WaitingPhrasesWindow:
         ctk.CTkLabel(
             body,
             text=(
-                "Personalize as reacoes "
+                "Personalize as reações "
                 "do MARVIN enquanto um lembrete "
                 "aguarda sua resposta."
             ),
@@ -383,9 +376,9 @@ class WaitingPhrasesWindow:
         self.vars = []
 
         labels = [
-            "Primeira reacao",
-            "Segunda reacao",
-            "Terceira reacao",
+            "Primeira reação",
+            "Segunda reação",
+            "Terceira reação",
         ]
 
 
@@ -505,7 +498,7 @@ class WaitingPhrasesWindow:
 
         ctk.CTkButton(
             actions,
-            text="Restaurar padrao",
+            text="Restaurar padrão",
             height=40,
             corner_radius=8,
             fg_color="transparent",
@@ -535,7 +528,7 @@ class WaitingPhrasesWindow:
 
         ctk.CTkButton(
             actions,
-            text="Salvar alteracoes",
+            text="Salvar alterações",
             height=40,
             corner_radius=8,
             fg_color=self.colors[

@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import customtkinter as ctk
+
+from .branding import marvin_icon, title_icon
 from PIL import Image
 
 from marvin.config import load_cfg
@@ -426,34 +428,10 @@ class HomeWindow:
         )
 
 
-        mark = ctk.CTkFrame(
+        mark = title_icon(
             left,
-            width=21,
-            height=21,
-            corner_radius=6,
-            fg_color=self.colors["accent"],
-        )
-
-        mark.pack(
-            side="left",
-        )
-
-        mark.pack_propagate(
-            False
-        )
-
-        ctk.CTkLabel(
-            mark,
-            text="",
-            text_color="#FFFFFF",
-            font=ctk.CTkFont(
-                size=10,
-                weight="bold",
-            ),
-        ).place(
-            relx=0.5,
-            rely=0.5,
-            anchor="center",
+            self.colors,
+            padx=0,
         )
 
 
@@ -568,15 +546,7 @@ class HomeWindow:
         )
 
         try:
-            self.marvin_head_image = ctk.CTkImage(
-                light_image=Image.open(
-                    icon_path
-                ),
-                dark_image=Image.open(
-                    icon_path
-                ),
-                size=(45, 45),
-            )
+            self.marvin_head_image = marvin_icon(45)
 
             avatar = ctk.CTkLabel(
                 header,
@@ -708,7 +678,7 @@ class HomeWindow:
             grid,
             1,
             0,
-            "▥",
+            "☀",
             self.colors["summary_bg"],
             self.colors["summary_fg"],
             "Resumo do dia",
@@ -1022,7 +992,12 @@ class HomeWindow:
         ].configure(
             text=(
                 f"{concluidos} de "
-                f"{total_itens} concluído"
+                f"{total_itens} "
+                + (
+                    "concluído"
+                    if total_itens == 1
+                    else "concluídos"
+                )
             )
         )
 

@@ -1,9 +1,14 @@
 import datetime
 import sqlite3
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 
+import customtkinter as ctk
+
+from .config import load_cfg
 from .database import DB_F
+from .theme import get_modern_palette
+from .ui.branding import close_button, title_icon, title_text
 from .ui.window_position import position_near
 
 
@@ -197,95 +202,241 @@ def listar_hoje():
     return resultado
 
 
-class NovoItemWindow:
+# ============================================================
+# INTERFACE
+# ============================================================
+
+DIAS_SEMANA = (
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado",
+    "domingo",
+)
+
+
+def _cores():
+    tema = load_cfg().get("tema", "escuro")
+
+    ctk.set_appearance_mode(
+        "Light" if tema == "claro" else "Dark"
+    )
+
+    return get_modern_palette(tema, "checklist")
+
+
+def _fonte(size, weight="normal"):
+    return ctk.CTkFont(
+        family="Segoe UI",
+        size=size,
+        weight=weight,
+    )
+
+
+class _JanelaBase:
+    """Janela sem borda do Windows, no mesmo estilo das demais."""
+
+    def __init__(self, parent, titulo, largura, altura):
+        self.c = _cores()
+
+        self.win = ctk.CTkToplevel(parent)
+        self.win.geometry(f"{largura}x{altura}")
+        self.win.overrideredirect(True)
+        self.win.configure(fg_color=self.c["bg"])
+        self.win.bind("<Escape>", lambda e: self.fechar())
+
+        self._drag = (0, 0)
+
+        self.shell = ctk.CTkFrame(
+            self.win,
+            fg_color=self.c["bg"],
+            corner_radius=14,
+            border_width=1,
+            border_color=self.c["border"],
+        )
+        self.shell.pack(fill="both", expand=True, padx=1, pady=1)
+
+        barra = ctk.CTkFrame(
+            self.shell,
+            height=44,
+            fg_color="transparent",
+        )
+        barra.pack(fill="x")
+        barra.pack_propagate(False)
+
+        drag = (self._drag_start, self._drag_move)
+
+        title_icon(barra, self.c, drag=drag)
+        title_text(barra, self.c, titulo, drag=drag)
+        close_button(barra, self.c, self.fechar)
+
+        barra.bind("<ButtonPress-1>", self._drag_start)
+        barra.bind("<B1-Motion>", self._drag_move)
+
+        ctk.CTkFrame(
+            self.shell,
+            height=1,
+            fg_color=self.c["border"],
+        ).pack(fill="x")
+
+        self.body = ctk.CTkFrame(
+            self.shell,
+            fg_color="transparent",
+        )
+        self.body.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=(16, 16),
+        )
+
+    def _drag_start(self, event):
+        self._drag = (
+            event.x_root - self.win.winfo_x(),
+            event.y_root - self.win.winfo_y(),
+        )
+
+    def _drag_move(self, event):
+        dx, dy = self._drag
+        self.win.geometry(
+            f"+{event.x_root - dx}+{event.y_root - dy}"
+        )
+
+    def fechar(self):
+        try:
+            self.win.destroy()
+        except Exception:
+            pass
+
+    def _botao_primario(self, parent, texto, comando, **kw):
+        return ctk.CTkButton(
+            parent,
+            text=texto,
+            height=kw.pop("height", 32),
+            corner_radius=8,
+            fg_color=self.c["accent"],
+            hover_color=self.c["accent_hover"],
+            text_color=self.c["on_accent"],
+            font=_fonte(10, "bold"),
+            command=comando,
+            **kw,
+        )
+
+    def _botao_secundario(self, parent, texto, comando, **kw):
+        return ctk.CTkButton(
+            parent,
+            text=texto,
+            height=kw.pop("height", 32),
+            corner_radius=8,
+            fg_color="transparent",
+            hover_color=self.c["hover"],
+            border_width=1,
+            border_color=self.c["border"],
+            text_color=self.c["text"],
+            font=_fonte(10),
+            command=comando,
+            **kw,
+        )
+
+
+class NovoItemWindow(_JanelaBase):
 
     def __init__(
         self,
         parent,
         callback,
     ):
+        super().__init__(parent, "Checklist", 360, 330)
+
         self.callback = callback
 
-        self.win = tk.Toplevel(parent)
-        self.win.title("Novo item")
-        self.win.geometry("360x220")
-        self.win.resizable(False, False)
+        ctk.CTkLabel(
+            self.body,
+            text="Novo item",
+            text_color=self.c["text"],
+            font=_fonte(17, "bold"),
+        ).pack(anchor="w", pady=(0, 14))
 
-        tk.Label(
-            self.win,
-            text="Novo item do checklist",
-            font=("Segoe UI", 14, "bold"),
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(20, 15),
+        self._rotulo("O QUE FAZER")
+
+        self.entry = ctk.CTkEntry(
+            self.body,
+            height=36,
+            corner_radius=8,
+            fg_color=self.c["card"],
+            border_width=1,
+            border_color=self.c["border"],
+            text_color=self.c["text"],
+            placeholder_text="Ex.: Conferir e-mails",
+            placeholder_text_color=self.c["dim"],
+            font=_fonte(11),
         )
+        self.entry.pack(fill="x", pady=(4, 14))
 
-        tk.Label(
-            self.win,
-            text="Tarefa",
-        ).pack(
-            anchor="w",
-            padx=20,
-        )
+        self._rotulo("QUANDO APARECE")
 
-        self.texto = tk.StringVar()
+        self.freq = tk.StringVar(value="Seg a Sex")
 
-        self.entry = ttk.Entry(
-            self.win,
-            textvariable=self.texto,
-        )
-
-        self.entry.pack(
-            fill="x",
-            padx=20,
-            pady=(4, 12),
-        )
-
-        tk.Label(
-            self.win,
-            text="Quando aparece",
-        ).pack(
-            anchor="w",
-            padx=20,
-        )
-
-        self.freq = tk.StringVar(
-            value="Seg a Sex"
-        )
-
-        ttk.Combobox(
-            self.win,
-            textvariable=self.freq,
-            values=FREQUENCIAS,
+        ctk.CTkComboBox(
+            self.body,
+            variable=self.freq,
+            values=list(FREQUENCIAS),
             state="readonly",
-        ).pack(
-            fill="x",
-            padx=20,
-            pady=(4, 15),
-        )
+            height=36,
+            corner_radius=8,
+            fg_color=self.c["card"],
+            border_width=1,
+            border_color=self.c["border"],
+            button_color=self.c["card"],
+            button_hover_color=self.c["hover"],
+            dropdown_fg_color=self.c["card"],
+            dropdown_hover_color=self.c["hover"],
+            dropdown_text_color=self.c["text"],
+            text_color=self.c["text"],
+            font=_fonte(11),
+            dropdown_font=_fonte(11),
+        ).pack(fill="x", pady=(4, 0))
 
-        ttk.Button(
-            self.win,
-            text="Adicionar",
-            command=self.salvar,
-        ).pack(
-            anchor="e",
-            padx=20,
-        )
+        rodape = ctk.CTkFrame(self.body, fg_color="transparent")
+        rodape.pack(side="bottom", fill="x")
+        rodape.grid_columnconfigure((0, 1), weight=1, uniform="b")
 
-        self.entry.bind(
-            "<Return>",
-            lambda event: self.salvar(),
-        )
+        self._botao_secundario(
+            rodape, "Cancelar", self.fechar, height=36,
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
-        self.entry.focus_set()
+        self._botao_primario(
+            rodape, "Adicionar", self.salvar, height=36,
+        ).grid(row=0, column=1, sticky="ew", padx=(5, 0))
 
+        self.entry.bind("<Return>", lambda event: self.salvar())
+
+        position_near(self.win, parent)
+
+        self.win.after(120, self._focar)
+
+    def _rotulo(self, texto):
+        ctk.CTkLabel(
+            self.body,
+            text=texto,
+            text_color=self.c["dim"],
+            font=_fonte(9, "bold"),
+        ).pack(anchor="w")
+
+    def _focar(self):
+        try:
+            self.win.focus_force()
+            self.entry.focus_set()
+        except Exception:
+            pass
 
     def salvar(self):
-        texto = self.texto.get().strip()
+        texto = self.entry.get().strip()
 
         if not texto:
+            self.entry.configure(border_color=self.c["red"])
             return
 
         criar_item(
@@ -293,91 +444,94 @@ class NovoItemWindow:
             self.freq.get(),
         )
 
-        self.win.destroy()
+        self.fechar()
         self.callback()
 
 
-class ChecklistWindow:
+class ChecklistWindow(_JanelaBase):
 
     def __init__(self, parent):
-        self.win = tk.Toplevel(parent)
+        super().__init__(parent, "Checklist", 470, 600)
 
-        self.win.title(
-            "MARVIN — Checklist diário"
-        )
+        topo = ctk.CTkFrame(self.body, fg_color="transparent")
+        topo.pack(fill="x")
 
-        self.win.geometry(
-            "470x600"
-        )
-
-        self.vars = {}
-
-        topo = tk.Frame(self.win)
-
-        topo.pack(
-            fill="x",
-            padx=20,
-            pady=(20, 10),
-        )
-
-        tk.Label(
+        ctk.CTkLabel(
             topo,
             text="Checklist diário",
-            font=("Segoe UI", 17, "bold"),
-        ).pack(
-            side="left"
-        )
+            text_color=self.c["text"],
+            font=_fonte(17, "bold"),
+        ).pack(side="left")
 
-        ttk.Button(
-            topo,
-            text="+ Adicionar",
-            command=self.novo,
-        ).pack(
-            side="right"
-        )
+        self._botao_primario(
+            topo, "+ Adicionar", self.novo, width=100, height=30,
+        ).pack(side="right")
 
         hoje = datetime.date.today()
 
-        self.lbl_data = tk.Label(
-            self.win,
-            text=hoje.strftime("%d/%m/%Y"),
-            fg="#777777",
-        )
+        ctk.CTkLabel(
+            self.body,
+            text=(
+                f"{DIAS_SEMANA[hoje.weekday()].capitalize()}, "
+                f"{hoje.strftime('%d/%m/%Y')}"
+            ),
+            text_color=self.c["dim"],
+            font=_fonte(10),
+        ).pack(anchor="w", pady=(2, 14))
 
-        self.lbl_data.pack(
-            anchor="w",
-            padx=20,
+        # Progresso do dia
+        progresso = ctk.CTkFrame(
+            self.body,
+            fg_color=self.c["card"],
+            corner_radius=10,
+            border_width=1,
+            border_color=self.c["border"],
         )
+        progresso.pack(fill="x", pady=(0, 14))
 
-        self.lbl_progresso = tk.Label(
-            self.win,
+        linha = ctk.CTkFrame(progresso, fg_color="transparent")
+        linha.pack(fill="x", padx=14, pady=(12, 6))
+
+        self.lbl_progresso = ctk.CTkLabel(
+            linha,
             text="",
-            font=("Segoe UI", 10, "bold"),
+            text_color=self.c["text"],
+            font=_fonte(11, "bold"),
         )
+        self.lbl_progresso.pack(side="left")
 
-        self.lbl_progresso.pack(
-            anchor="w",
-            padx=20,
-            pady=(10, 8),
+        self.lbl_percentual = ctk.CTkLabel(
+            linha,
+            text="",
+            text_color=self.c["dim"],
+            font=_fonte(10),
         )
+        self.lbl_percentual.pack(side="right")
 
-        ttk.Separator(
-            self.win
-        ).pack(
-            fill="x",
-            padx=20,
+        self.barra = ctk.CTkProgressBar(
+            progresso,
+            height=6,
+            corner_radius=3,
+            fg_color=self.c["surface"],
+            progress_color=self.c["accent"],
         )
+        self.barra.pack(fill="x", padx=14, pady=(0, 14))
+        self.barra.set(0)
 
-        self.lista = tk.Frame(
-            self.win
+        self.lista = ctk.CTkScrollableFrame(
+            self.body,
+            fg_color="transparent",
+            scrollbar_button_color=self.c["border"],
+            scrollbar_button_hover_color=self.c["dim"],
         )
+        self.lista.pack(fill="both", expand=True)
 
-        self.lista.pack(
-            fill="both",
-            expand=True,
-            padx=20,
-            pady=10,
-        )
+        ctk.CTkLabel(
+            self.body,
+            text="Os itens voltam a ficar pendentes todos os dias.",
+            text_color=self.c["dim"],
+            font=_fonte(9),
+        ).pack(anchor="w", pady=(8, 0))
 
         self.refresh()
 
@@ -386,27 +540,22 @@ class ChecklistWindow:
             parent,
         )
 
-
     def novo(self):
         NovoItemWindow(
             self.win,
             self.refresh,
         )
 
-
     def toggle(
         self,
-        item_id,
+        item,
     ):
-        var = self.vars[item_id]
-
         marcar_item(
-            item_id,
-            var.get(),
+            item["id"],
+            not item["concluido"],
         )
 
-        self.atualizar_progresso()
-
+        self.refresh()
 
     def excluir(
         self,
@@ -414,7 +563,7 @@ class ChecklistWindow:
     ):
         ok = messagebox.askyesno(
             "Excluir",
-            f"Excluir '{item['texto']}'?",
+            f"Excluir '{item['texto']}' do checklist?",
             parent=self.win,
         )
 
@@ -427,101 +576,78 @@ class ChecklistWindow:
 
         self.refresh()
 
-
-    def menu_item(
-        self,
-        event,
-        item,
-    ):
-        menu = tk.Menu(
-            self.win,
-            tearoff=0,
-        )
-
-        menu.add_command(
-            label="Excluir",
-            command=lambda:
-                self.excluir(item),
-        )
-
-        menu.tk_popup(
-            event.x_root,
-            event.y_root,
-        )
-
-
     def linha(
         self,
         item,
     ):
-        frame = tk.Frame(
-            self.lista
+        feito = item["concluido"]
+
+        card = ctk.CTkFrame(
+            self.lista,
+            fg_color=self.c["card"],
+            corner_radius=10,
+            border_width=1,
+            border_color=self.c["border"],
         )
+        card.pack(fill="x", padx=(0, 6), pady=(0, 8))
 
-        frame.pack(
-            fill="x",
-            pady=4,
+        check = ctk.CTkCheckBox(
+            card,
+            text="",
+            width=20,
+            checkbox_width=20,
+            checkbox_height=20,
+            corner_radius=10,
+            border_width=1,
+            fg_color=self.c["done_bg"],
+            hover_color=self.c["done_bg"],
+            border_color=(
+                self.c["done_fg"] if feito else self.c["border"]
+            ),
+            checkmark_color=self.c["done_fg"],
+            command=lambda i=item: self.toggle(i),
         )
+        if feito:
+            check.select()
+        check.pack(side="left", padx=(12, 8), pady=12)
 
-        var = tk.BooleanVar(
-            value=item["concluido"]
-        )
-
-        self.vars[
-            item["id"]
-        ] = var
-
-        check = ttk.Checkbutton(
-            frame,
-            variable=var,
-            command=lambda i=item["id"]:
-                self.toggle(i),
-        )
-
-        check.pack(
-            side="left"
-        )
-
-        texto = tk.Label(
-            frame,
+        ctk.CTkLabel(
+            card,
             text=item["texto"],
             anchor="w",
-            font=("Segoe UI", 10),
-        )
+            text_color=self.c["dim"] if feito else self.c["text"],
+            font=ctk.CTkFont(
+                family="Segoe UI",
+                size=10,
+                weight="normal" if feito else "bold",
+                overstrike=feito,
+            ),
+        ).pack(side="left", fill="x", expand=True)
 
-        texto.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            padx=5,
-        )
+        ctk.CTkButton(
+            card,
+            text="Excluir",
+            width=50,
+            height=24,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color=self.c["hover"],
+            text_color=self.c["red"],
+            font=_fonte(9),
+            command=lambda i=item: self.excluir(i),
+        ).pack(side="right", padx=(0, 8))
 
-        freq = tk.Label(
-            frame,
-            text=item["frequencia"],
-            fg="#888888",
-            font=("Segoe UI", 8),
-        )
+        ctk.CTkLabel(
+            card,
+            text=f"  {item['frequencia']}  ",
+            height=19,
+            corner_radius=6,
+            fg_color=self.c["surface"],
+            text_color=self.c["dim"],
+            font=_fonte(8, "bold"),
+        ).pack(side="right", padx=(6, 4))
 
-        freq.pack(
-            side="right"
-        )
-
-        for widget in (
-            frame,
-            texto,
-            freq,
-        ):
-            widget.bind(
-                "<Button-3>",
-                lambda e, i=item:
-                    self.menu_item(e, i),
-            )
-
-
-    def atualizar_progresso(self):
-        itens = listar_hoje()
-
+    def atualizar_progresso(self, itens):
         total = len(itens)
 
         feitos = sum(
@@ -530,10 +656,28 @@ class ChecklistWindow:
             if item["concluido"]
         )
 
-        self.lbl_progresso.config(
-            text=f"{feitos} de {total} concluídos"
+        self.lbl_progresso.configure(
+            text=(
+                f"{feitos} de {total} concluído"
+                if total == 1
+                else f"{feitos} de {total} concluídos"
+            )
         )
 
+        fracao = feitos / total if total else 0
+
+        self.lbl_percentual.configure(
+            text=f"{round(fracao * 100)}%"
+        )
+
+        self.barra.configure(
+            progress_color=(
+                self.c["green"]
+                if total and feitos == total
+                else self.c["accent"]
+            )
+        )
+        self.barra.set(fracao)
 
     def refresh(self):
         for widget in (
@@ -541,28 +685,39 @@ class ChecklistWindow:
         ):
             widget.destroy()
 
-        self.vars.clear()
-
         itens = listar_hoje()
 
         if not itens:
-            tk.Label(
-                self.lista,
+            vazio = ctk.CTkFrame(self.lista, fg_color="transparent")
+            vazio.pack(fill="x", pady=50)
+
+            ctk.CTkLabel(
+                vazio,
+                text="Nenhum item para hoje",
+                text_color=self.c["text"],
+                font=_fonte(12, "bold"),
+            ).pack()
+
+            ctk.CTkLabel(
+                vazio,
                 text=(
-                    "Nenhum item para hoje.\n\n"
-                    "Clique em + Adicionar."
+                    "Adicione hábitos e rotinas que se repetem,\n"
+                    "como conferir e-mails ou beber água."
                 ),
-                fg="#777777",
-                font=("Segoe UI", 10),
-            ).pack(
-                pady=70
-            )
+                text_color=self.c["dim"],
+                justify="center",
+                font=_fonte(10),
+            ).pack(pady=(4, 14))
+
+            self._botao_secundario(
+                vazio, "+ Adicionar item", self.novo, width=140,
+            ).pack()
 
         else:
             for item in itens:
                 self.linha(item)
 
-        self.atualizar_progresso()
+        self.atualizar_progresso(itens)
 
 
 def abrir_checklist(parent):
@@ -570,7 +725,7 @@ def abrir_checklist(parent):
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ctk.CTk()
     root.withdraw()
 
     abrir_checklist(root)
