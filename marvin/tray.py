@@ -39,8 +39,13 @@ class TrayController:
         compact_enabled,
         on_settings,
         on_exit,
+        on_quick_capture=None,
+        quick_capture_hotkey="",
     ):
         self.root = root
+
+        self._on_quick_capture = on_quick_capture
+        self._quick_capture_hotkey = quick_capture_hotkey
 
         self._on_show = on_show
 
@@ -298,6 +303,19 @@ class TrayController:
                         self._on_show
                     ),
                 default=True,
+            ),
+
+            pystray.MenuItem(
+                (
+                    f"Captura rápida ({self._quick_capture_hotkey})"
+                    if self._quick_capture_hotkey
+                    else "Captura rápida"
+                ),
+                lambda icon, item:
+                    self.dispatch(
+                        self._on_quick_capture
+                    ),
+                visible=self._on_quick_capture is not None,
             ),
 
             pystray.MenuItem(

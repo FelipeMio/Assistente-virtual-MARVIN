@@ -55,6 +55,8 @@ from .ui.waiting_phrases import WaitingPhrasesWindow as WaitingPhrasesWindowUI
 from .ui.edit_task import EditTaskWindow as EditTaskWindowUI
 from .ui.new_task import NewTaskWindow as NewTaskWindowUI
 from .ui.task_list import TaskWindow as TaskWindowUI
+from .ui.quick_capture import QuickCaptureWindow as QuickCaptureWindowUI
+from .hotkey import GlobalHotkey
 
 from marvin.database import (
     DB_F,
@@ -572,6 +574,39 @@ def NewTaskWindow(
     )
 
 
+#  JANELA: CAPTURA RAPIDA
+
+def QuickCaptureWindow(
+    parent,
+    companion,
+):
+    """
+    Abre a captura rapida (uma instancia por vez).
+    Se ja estiver aberta, apenas traz para frente.
+    """
+    atual = getattr(
+        companion,
+        "_quick_capture_window",
+        None,
+    )
+
+    if atual is not None and atual.existe():
+        atual.focar()
+        return atual
+
+    janela = QuickCaptureWindowUI(
+        parent,
+        companion,
+        config=cfg,
+        palette_factory=get_modern_palette,
+        db_create=db_criar,
+    )
+
+    companion._quick_capture_window = janela
+
+    return janela
+
+
 #  JANELA: LISTA DE TAREFAS
 
 def TaskWindow(
@@ -983,6 +1018,21 @@ class MarvinCompanion:
                 self._compact_enabled,
             on_settings=self._tray_settings,
             on_exit=self._on_close,
+            on_quick_capture=self._open_quick_capture,
+            quick_capture_hotkey=cfg.get(
+                "atalho_captura",
+                "Ctrl+Alt+M",
+            ),
+        )
+
+        # Atalho global para a captura rapida.
+        self._hotkey = GlobalHotkey(
+            self.root,
+            cfg.get(
+                "atalho_captura",
+                "Ctrl+Alt+M",
+            ),
+            self._open_quick_capture,
         )
         
         
@@ -1075,6 +1125,7 @@ class MarvinCompanion:
                 self._stop_animation
             ),
             start_day_delay_ms=900,
+            hotkey=self._hotkey,
         )
 
         self._lifecycle.start()
@@ -1137,6 +1188,13 @@ class MarvinCompanion:
             abrir_resumo=self._routine.summary,
             abrir_config=lambda:
                 SettingsWindow(self.root, self),
+        )
+
+
+    def _open_quick_capture(self):
+        QuickCaptureWindow(
+            self.root,
+            self,
         )
 
 

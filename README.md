@@ -56,6 +56,20 @@ A identidade visual do personagem foi desenvolvida especificamente para o projet
 - Pesquisar tarefas
 - Filtrar por status e por prioridade
 
+### Captura rápida
+
+Pressione **`Ctrl+Alt+M`** em qualquer programa (ou use o menu da bandeja) e escreva a tarefa como você falaria:
+
+| Você escreve | O MARVIN cria |
+| --- | --- |
+| `reunião com o time amanhã 15h` | Reunião com o time — amanhã, 15:00 |
+| `pagar boleto dia 20 prioridade alta` | Pagar boleto — dia 20, 09:00, prioridade alta |
+| `beber água todo dia 10h` | Beber água — todo dia, 10:00 |
+| `ligar pro cliente sexta 9h30` | Ligar pro cliente — sexta, 09:30 |
+| `revisar relatório em 2 horas` | Revisar relatório — daqui a 2 horas |
+
+Uma prévia mostra o que foi entendido antes de salvar. Tudo é interpretado localmente, sem internet. O atalho pode ser trocado pela chave `atalho_captura` em `%USERPROFILE%\.marvin\config.json`.
+
 ### Recorrência
 
 O MARVIN suporta tarefas:

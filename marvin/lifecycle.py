@@ -30,11 +30,13 @@ class LifecycleController:
         start_animation,
         stop_animation,
         start_day_delay_ms=900,
+        hotkey=None,
     ):
         self.root = root
         self.companion = companion
 
         self.tray = tray
+        self.hotkey = hotkey
         self.reminders = reminders
         self.routine = routine
 
@@ -106,6 +108,14 @@ class LifecycleController:
         self.routine.start()
 
         self.tray.start()
+
+        if self.hotkey is not None:
+            try:
+                self.hotkey.start()
+            except Exception:
+                logger.exception(
+                    "Erro ao iniciar o atalho global."
+                )
 
         self._start_animation()
 
@@ -228,6 +238,12 @@ class LifecycleController:
             self.tray,
             "bandeja",
         )
+
+        if self.hotkey is not None:
+            self._stop_service(
+                self.hotkey,
+                "atalho global",
+            )
 
         self._join_cleanup_thread()
 
