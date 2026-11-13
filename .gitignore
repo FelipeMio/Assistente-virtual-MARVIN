@@ -1,9 +1,25 @@
-﻿__pycache__/
-*.pyc
+﻿# Python
+__pycache__/
+*.py[cod]
+*.prof
+.pytest_cache/
+.venv/
+venv/
 
+# Build (PyInstaller / Inno Setup)
 build/
 dist/
-
-extensions/goe/config.json
-
 release/
+
+# Configuracoes locais das extensoes (podem conter caminhos e tokens)
+extensions/*/config.json
+extensions/goe/.goe_test_command
+
+# Arquivos locais de trabalho (backups, notas, rascunhos)
+_local/
+
+# Editores / sistema
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
