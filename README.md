@@ -1,7 +1,7 @@
 # MARVIN — Assistente Virtual
 
 <p align="center">
-  <img src="assets/marvin/marvin_head.png" alt="MARVIN" width="120">
+  <img src="assets/marvin/app_icon_preview.png" alt="MARVIN" width="128">
 </p>
 
 ![Testes](https://github.com/FelipeMio/Assistente-virtual-MARVIN/actions/workflows/tests.yml/badge.svg)
